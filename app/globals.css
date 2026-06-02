@@ -1,26 +1,34 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Brand colour palette ── */
+@theme {
+  --color-brand-orange: #E8622C;
+  --color-brand-orange-light: #FBE8DA;
+  --color-brand-teal: #2D5F4E;
+  --color-brand-teal-light: #D6EBE0;
+  --color-brand-brown: #2C1510;
+  --color-brand-cream: #F5EDE0;
+  --color-brand-cream-border: #E8DDD0;
+  --color-brand-amber: #C4952B;
+  --color-brand-amber-light: #F5E8C4;
+  --color-brand-blue: #2B5DA6;
+  --color-brand-blue-light: #D6E4F5;
+  --color-brand-pink: #A0445A;
+  --color-brand-pink-light: #F0D4DC;
+
+  /* Font stacks */
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #F5EDE0;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

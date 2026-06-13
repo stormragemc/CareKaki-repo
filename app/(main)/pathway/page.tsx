@@ -1,8 +1,31 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import PathwayBoard from "@/components/pathway/PathwayBoard";
-import { mockPathwayColumns, mockCareProfile } from "@/lib/mock-data";
+import type { PathwayColumnData, CareProfile } from "@/lib/types";
+import { mockCareProfile } from "@/lib/mock-data";
 
 export default function PathwayPage() {
+  const [columns, setColumns] = useState<PathwayColumnData[]>([]);
+  const [patientName, setPatientName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("careProfile");
+    const profile: CareProfile = stored ? JSON.parse(stored) : mockCareProfile;
+    setPatientName(profile.name);
+
+    fetch("http://localhost:8000/pathway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile }),
+    })
+      .then((res) => res.json())
+      .then((data) => setColumns(data.columns ?? []))
+      .finally(() => setIsLoading(false));
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col gap-8">
       {/* Page header */}
@@ -19,13 +42,11 @@ export default function PathwayPage() {
       </div>
 
       {/* 4-column board */}
-      {/* INTEGRATION POINT: Replace mockPathwayColumns with data fetched from
-          your backend Pathway Reasoner service. Pass the CareProfile as input
-          to generate a personalised, live plan. */}
-      <PathwayBoard
-        columns={mockPathwayColumns}
-        patientName={mockCareProfile.name}
-      />
+      {isLoading ? (
+        <p className="text-sm text-gray-500">Generating your personalised plan…</p>
+      ) : (
+        <PathwayBoard columns={columns} patientName={patientName} />
+      )}
 
       {/* Escalation banner */}
       <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-brand-teal-light border border-brand-teal/20">

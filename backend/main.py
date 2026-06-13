@@ -1,7 +1,8 @@
 import os
 import json
+import requests
 import google.generativeai as genai
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -9,6 +10,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+# Hackathon-simple in-memory state (resets when server restarts)
+caregiver_chat_id: int | None = None
 
 app = FastAPI()
 
@@ -42,6 +49,16 @@ each with these fields:
 Base every item on the actual profile details given — living situation, mobility,
 conditions, caregiver capacity, and financial tier."""
 
+CLASSIFY_PROMPT = """A caregiver replied to an emergency alert about their family
+member. Classify their message and return only a JSON object with these fields:
+- intent: one of "caregiver_responding", "asking_question", "unclear"
+- status: one of "on_the_way", "cannot_go", "delegating", "unknown"
+- eta_minutes: number or null
+- extra_request: short string describing any extra request, or null
+- urgency: one of "low", "medium", "high"
+
+Caregiver message: """
+
 chat_model = genai.GenerativeModel(
     model_name="gemini-3.5-flash",
     system_instruction=SYSTEM_PROMPT,
@@ -73,6 +90,18 @@ def to_gemini_history(messages: list[Message]):
         }
         for msg in messages
     ]
+
+
+def send_telegram_message(chat_id: int, text: str, buttons: list[list[str]] | None = None):
+    payload = {"chat_id": chat_id, "text": text}
+    if buttons:
+        payload["reply_markup"] = json.dumps({
+            "inline_keyboard": [
+                [{"text": label, "callback_data": label} for label in row]
+                for row in buttons
+            ]
+        })
+    requests.post(f"{TELEGRAM_API}/sendMessage", data=payload)
 
 
 @app.get("/")
@@ -122,3 +151,79 @@ def pathway(request: PathwayRequest):
         columns = []
 
     return {"columns": columns}
+
+
+class EmergencyAlert(BaseModel):
+    message: str
+
+
+@app.post("/carekaki/emergency-alert")
+def emergency_alert(request: EmergencyAlert):
+    if not caregiver_chat_id:
+        return {"ok": False, "error": "No caregiver has /start'd the bot yet"}
+
+    send_telegram_message(
+        caregiver_chat_id,
+        request.message,
+        buttons=[["I'm going now", "Call ambulance"], ["Ask neighbor", "Escalate"]],
+    )
+    return {"ok": True}
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    global caregiver_chat_id
+    update = await request.json()
+
+    # /start — store the chat_id so we know where to send alerts
+    if "message" in update and update["message"].get("text") == "/start":
+        caregiver_chat_id = update["message"]["chat"]["id"]
+        send_telegram_message(caregiver_chat_id, "CareKaki connected. You'll receive alerts here.")
+        return {"ok": True}
+
+    # Button tap — direct mapping, no LLM needed
+    if "callback_query" in update:
+        query = update["callback_query"]
+        chat_id = query["message"]["chat"]["id"]
+        choice = query["data"]
+
+        replies = {
+            "I'm going now": "Got it — marked you as the responder. Stay safe!",
+            "Call ambulance": "Okay — please call 995 now if it's serious.",
+            "Ask neighbor": "Understood — let us know once a neighbor confirms.",
+            "Escalate": "Escalating to the ICCP coordinator now.",
+        }
+        send_telegram_message(chat_id, replies.get(choice, "Got it, thanks!"))
+        return {"ok": True}
+
+    # Free-text reply — send to Gemini for classification
+    if "message" in update and "text" in update["message"]:
+        chat_id = update["message"]["chat"]["id"]
+        text = update["message"]["text"]
+
+        classification = extraction_model.generate_content(
+            f"{CLASSIFY_PROMPT}{text}",
+            generation_config={"response_mime_type": "application/json"},
+        )
+
+        try:
+            result = json.loads(classification.text)
+        except Exception:
+            result = {}
+
+        eta = result.get("eta_minutes")
+        extra = result.get("extra_request")
+
+        reply_parts = ["Got it."]
+        if eta:
+            reply_parts.append(f"I've marked you as the primary responder with ETA {eta} minutes.")
+        if extra:
+            reply_parts.append(f"I'll also help with: {extra}.")
+
+        send_telegram_message(chat_id, " ".join(reply_parts))
+        return {"ok": True, "classification": result}
+
+    return {"ok": True}
+
+
+

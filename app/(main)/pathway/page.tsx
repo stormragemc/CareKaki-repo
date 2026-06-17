@@ -16,13 +16,25 @@ export default function PathwayPage() {
     const profile: CareProfile = stored ? JSON.parse(stored) : mockCareProfile;
     setPatientName(profile.name);
 
+    const cached = sessionStorage.getItem("pathwayColumns");
+    const cachedFor = sessionStorage.getItem("pathwayProfile");
+    if (cached && cachedFor === JSON.stringify(profile)) {
+      setColumns(JSON.parse(cached));
+      setIsLoading(false);
+      return;
+    }
+
     fetch("http://localhost:8000/pathway", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profile }),
     })
       .then((res) => res.json())
-      .then((data) => setColumns(data.columns ?? []))
+      .then((data) => {
+        setColumns(data.columns ?? []);
+        sessionStorage.setItem("pathwayColumns", JSON.stringify(data.columns ?? []));
+        sessionStorage.setItem("pathwayProfile", JSON.stringify(profile));
+      })
       .finally(() => setIsLoading(false));
   }, []);
 

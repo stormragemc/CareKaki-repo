@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
-import AutopilotDashboard from "@/components/autopilot/AutopilotDashboard";
-import { mockAutopilotServices } from "@/lib/mock-data";
+import AgentWorkspace from "@/components/autopilot/AgentWorkspace";
 
 export default function AutopilotPage() {
   return (
@@ -31,12 +30,12 @@ export default function AutopilotPage() {
         </div>
       </header>
 
-      {/* Dashboard */}
-      {/* INTEGRATION POINT: Replace mockAutopilotServices with a real-time
-          data source (WebSocket / SSE). Connect service statuses to actual
-          agent actions via the Autopilot Orchestrator microservice. */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">
-        <AutopilotDashboard services={mockAutopilotServices} />
+      {/* Live agent workspace */}
+      {/* INTEGRATION POINT: Each panel should poll/subscribe to its own
+          backend feed (ICCP handover, HomeNursing booking, AIC application,
+          Telegram webhook log) and stream entries in as they happen. */}
+      <main className="flex-1 w-full px-4 py-4 overflow-hidden">
+        <AgentWorkspace />
       </main>
     </div>
   );

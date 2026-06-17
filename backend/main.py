@@ -1,10 +1,12 @@
 import os
 import json
 import requests
+from datetime import datetime
 import google.generativeai as genai
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,6 +18,16 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 # Hackathon-simple in-memory state (resets when server restarts)
 caregiver_chat_id: int | None = None
+telegram_log: list[dict] = []
+
+
+def log_telegram(from_: str, text: str, buttons: list[str] | None = None):
+    telegram_log.append({
+        "from": from_,           # "bot" or "user"
+        "text": text,
+        "buttons": buttons,
+        "time": datetime.now().strftime("%I:%M %p"),
+    })
 
 app = FastAPI()
 
@@ -109,6 +121,11 @@ def check():
     return {"status": "Backend running"}
 
 
+@app.get("/telegram/log")
+def get_telegram_log():
+    return {"log": telegram_log}
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     history = to_gemini_history(request.messages[:-1])
@@ -162,11 +179,13 @@ def emergency_alert(request: EmergencyAlert):
     if not caregiver_chat_id:
         return {"ok": False, "error": "No caregiver has /start'd the bot yet"}
 
+    buttons = ["I'm going now", "Call ambulance", "Ask neighbor", "Escalate"]
     send_telegram_message(
         caregiver_chat_id,
         request.message,
-        buttons=[["I'm going now", "Call ambulance"], ["Ask neighbor", "Escalate"]],
+        buttons=[buttons[:2], buttons[2:]],
     )
+    log_telegram("bot", request.message, buttons=buttons)
     return {"ok": True}
 
 
@@ -193,13 +212,17 @@ async def telegram_webhook(request: Request):
             "Ask neighbor": "Understood — let us know once a neighbor confirms.",
             "Escalate": "Escalating to the ICCP coordinator now.",
         }
-        send_telegram_message(chat_id, replies.get(choice, "Got it, thanks!"))
+        log_telegram("user", choice)
+        reply_text = replies.get(choice, "Got it, thanks!")
+        send_telegram_message(chat_id, reply_text)
+        log_telegram("bot", reply_text)
         return {"ok": True}
 
     # Free-text reply — send to Gemini for classification
     if "message" in update and "text" in update["message"]:
         chat_id = update["message"]["chat"]["id"]
         text = update["message"]["text"]
+        log_telegram("user", text)
 
         classification = extraction_model.generate_content(
             f"{CLASSIFY_PROMPT}{text}",
@@ -220,10 +243,49 @@ async def telegram_webhook(request: Request):
         if extra:
             reply_parts.append(f"I'll also help with: {extra}.")
 
-        send_telegram_message(chat_id, " ".join(reply_parts))
+        reply_text = " ".join(reply_parts)
+        send_telegram_message(chat_id, reply_text)
+        log_telegram("bot", reply_text)
         return {"ok": True, "classification": result}
 
     return {"ok": True}
 
 
+# ── AIC-style eldercare recommendation adapter ──────────────────────────────
 
+from services.aic_adapter import recommend_aic_services
+from services.nursing_adapter import recommend_nursing_providers
+
+
+class AICRecommendRequest(BaseModel):
+    care_need: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    limit: int = 3
+
+
+@app.post("/integrations/aic/recommend")
+def aic_recommend(req: AICRecommendRequest):
+    return recommend_aic_services(
+        care_need=req.care_need,
+        user_latitude=req.latitude,
+        user_longitude=req.longitude,
+        limit=req.limit,
+    )
+
+
+class NursingRecommendRequest(BaseModel):
+    care_need: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    limit: int = 3
+
+
+@app.post("/integrations/nursing/recommend")
+def nursing_recommend(req: NursingRecommendRequest):
+    return recommend_nursing_providers(
+        care_need=req.care_need,
+        user_latitude=req.latitude,
+        user_longitude=req.longitude,
+        limit=req.limit,
+    )

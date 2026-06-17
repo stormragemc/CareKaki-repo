@@ -122,8 +122,10 @@ Guardian** (the deck's "6th card" was Guardian itself; it is the wrapper, not a 
 3. **Social — Active Ageing Centre (AAC) enrolment.** The whole-person agent; this is what makes
    Mr Lim's loneliness case diverge from Mdm Tan's, on the *same* engine (see §5).
 4. **Coordination — Care Corner / ICCP warm handover (THE HERO).** Routed to the least-loaded
-   officer (Aunty Mei) with the **Care Brief preloaded**. The partner is in the room — this is
-   the emotional peak of the slide, not one tile of six.
+   officer (Aunty Mei — **confirm with Care Corner whether this should stay a placeholder name
+   or reference an actual coordinator**, since the partner will be in the room) with the **Care
+   Brief preloaded**. The partner is in the room — this is the emotional peak of the slide, not
+   one tile of six.
 5. **Comms — WhatsApp to the family.** Plain-language summary + reassurance thread — the
    **genuinely live** integration (a real message lands on a real phone).
 
@@ -185,8 +187,13 @@ IDENTITY/DATA     Singpass (login) · MyInfo (verified data on consent)
 INTEGRATIONS      AIC API · Home Nursing · ICCP coordinator · WhatsApp Business · Polyclinic · AAC · Google Calendar
 ```
 
-Properties: **Kubernetes-orchestrated · containerized · stateless services · event-driven ·
-API-first · observable.** Each service is independently deployable.
+Properties (target architecture): **Kubernetes-orchestrated · containerized · stateless
+services · event-driven · API-first · observable.** Each service is designed to be
+independently deployable.
+
+> **Build status:** no k8s manifests exist yet (see `user-flows.md` §6, "Cross-cutting"). Say
+> "designed for" rather than implying a cluster is already running, unless one actually is by
+> demo day.
 
 > **The agent never talks to a service directly — only through APIs, only after Guardian.**
 
@@ -332,8 +339,13 @@ personas) — the real consent flow in test mode, which itself proves "we integr
 government rails." Production swaps in the live MyInfo API (a registration/approval step).
 
 **Delegation wrinkle (have the answer ready):** a caregiver acting for a senior is a delegation
-case (whose Singpass?). Singapore has proxy / authorisation mechanisms; in CareKaki's flow the
-senior consents once at onboarding so the caregiver can act on their behalf.
+case (whose Singpass?). Singapore doesn't have one generic "delegate my Singpass" API — what
+exists today is service-specific (e.g. HealthHub's caregiver-link model for Healthier SG, or the
+next-of-kin / Lasting Power of Attorney route required for checking government benefits on
+someone else's behalf). **CareKaki's flow models that same pattern, not a real integration**: the
+senior consents once at onboarding, and the caregiver acts on their behalf for the rest of the
+session. Be ready to say plainly, if asked, that the actual delegation mechanism is simulated, and
+going live would mean partnering with whichever agency's rail it ends up modeling.
 
 ---
 
@@ -341,14 +353,21 @@ senior consents once at onboarding so the caregiver can act on their behalf.
 
 > **Safety is an architectural choice, not a prompt instruction.**
 
-Guardian is a **policy plane between the LLM and the world** — an actual service, auditable,
-testable, deployable. Every CareKaki action flows through it. Six principles:
+Guardian is designed as a **policy plane between the LLM and the world** — an actual service,
+auditable, testable, deployable. Every CareKaki action is meant to flow through it.
 
-1. **No medical advice** — clinical questions are intercepted and routed to a human. CareKaki suggests services, never diagnoses.
-2. **PDPA-aware by default** — NRIC, income, and medical details tokenised at ingest; PII never leaves the regional boundary.
+> **Build status (added in judge-review pass, 2026-06-17):** Guardian does not exist as a running
+> service yet — see `user-flows.md` §6, "Cross-cutting." Until at least a minimal stub exists,
+> describe Guardian as the safety architecture the product is built around, not as a service a
+> judge can be shown live.
+
+Six principles:
+
+1. **No medical advice** — clinical questions are intercepted and routed to a human. CareKaki recommends categories of services already vetted by Care Corner's intake criteria (e.g. "eligible for home nursing visits") — it never assesses condition severity, diagnoses, or judges treatment appropriateness itself.
+2. **PDPA-aware by default** — NRIC, income, and medical details tokenised at ingest; **designed so** PII never leaves the regional boundary *(verify this against whichever cloud region the team actually deploys to before claiming it — don't assert it until it's confirmed)*.
 3. **Human-in-the-loop** — complexity and risk signals auto-escalate to a Care Corner coordinator; no LLM-only decisions on care plans. **Autopilot is draft-then-confirm** (the user approves every action; only human-escalation bypasses confirmation — see §4 Beat 4).
 4. **Traceable recommendations** — every recommendation links back to facts in the Living Care Profile (the "why this for you" tags); auditable, never hand-wavy.
-5. **Bias monitoring** — pathway outputs sampled weekly; coverage across income tiers and conditions reviewed by Care Corner. *(Note: soften any hard "languages" claim — the demo is English-only; multilingual is real at the conversation layer but a config step for the UI. See the Q&A answer below.)*
+5. **Bias monitoring** — pathway outputs sampled weekly; coverage across income tiers and conditions reviewed by Care Corner. **This is a post-launch governance commitment, not a feature running in the prototype** — don't imply a live dashboard exists today. *(Note: soften any hard "languages" claim — the demo is English-only; multilingual is real at the conversation layer but a config step for the UI. See the Q&A answer below.)*
 6. **One click to human** — a coordinator is reachable from every screen; the family never has to ask twice.
 
 > **Multilingual — the Q&A answer:** multilingual is essentially free in the architecture, not a
@@ -356,8 +375,11 @@ testable, deployable. Every CareKaki action flows through it. Six principles:
 > Singlish; the profile is structured data, so it's language-independent; and MyInfo can carry the
 > senior's preferred language. The demo is English for clarity; productionizing means translating
 > fixed UI strings and getting WhatsApp templates approved per language (WhatsApp supports a
-> language code per template) — configuration, not re-engineering. Care Corner reviews pathway
-> quality across language groups, so CareKaki isn't better in English than in Tamil.
+> language code per template) — configuration, not re-engineering. **We haven't load-tested
+> extraction quality across languages yet, so the honest claim is "the architecture supports
+> it," not "it's already proven equally good in every language."** Care Corner's role is to
+> review pathway quality across language groups once it's live — that's a post-launch check,
+> not something to claim is already done.
 
 ---
 
@@ -382,8 +404,9 @@ testable, deployable. Every CareKaki action flows through it. Six principles:
 **1 front door · 5 services orchestrated (under one Guardian) · 0 forms to fill in.**
 
 *(The deck's memorable "1 / 6 / 0" counted Guardian as the 6th. With Guardian reframed as the
-wrapper, the honest count is 5 services. Keep whichever number the deck uses consistent across
-all surfaces — message over digit: spans medical and social, all under Guardian, zero forms.)*
+wrapper, the honest count is 5 services. **Action item: open the actual deck file and count the
+tiles on the relevant slide before demo day** — don't leave this as a documented tension; pick
+one number and make every surface (deck, script, this doc, the UI) match it.)*
 
 ---
 

@@ -31,6 +31,12 @@ Switching is: enable Vertex AI API → request Claude Sonnet 4.6 in Model Garden
 Anthropic SDK at the Vertex endpoint with `gcloud` auth. The flows below do not depend on which
 model is used.
 
+**Build note — Singpass/MyInfo sandbox setup time (verify early, added in judge-review pass):**
+§6b gives WhatsApp a precise demo-vs-production timeline; Singpass/MyInfo doesn't have an
+equivalent yet. Before relying on Stage 1 for the live demo, confirm how long sandbox
+access/setup actually takes for this team (account registration, redirect URIs, test personas)
+and document it here the same way. Right now this is an open risk, not a known quantity.
+
 ---
 
 ## 1. Integration legend (§6a posture: anchor real, simulate the rest — never substitute)
@@ -38,7 +44,7 @@ model is used.
 | Tag | Meaning | In these flows |
 |---|---|---|
 | 🟢 **REAL** | Genuinely live in the demo | **WhatsApp** (Meta Business Cloud API), **Singpass + MyInfo** (official **sandbox**, real consent flow in test mode), **Google Calendar** (real nurse-visit invite) |
-| 🟡 **SIMULATED** | Simulated against the agency's real interface; going live is a partnership/data-governance step, not engineering | **AIC** Home Caregiving Grant, **Home Nursing** (HNF / NTUC Health), **ICCP / Care Corner** routing, **polyclinic / medication** |
+| 🟡 **SIMULATED** | Simulated against the agency's real interface; going live is a partnership/data-governance step, not engineering | **AIC** Home Caregiving Grant, **Home Nursing** (HNF / NTUC Health), **ICCP / Care Corner** routing, **polyclinic / medication** *(medication review is pathway-only — see Decisions Locked above — not an Autopilot integration)* |
 | ⚙️ **ORCHESTRATION** | Always real — fan-out, async state, status progression | The Autopilot Orchestrator itself |
 
 > Q&A framing: *"The orchestration is live — you saw a real WhatsApp, a real calendar invite, and
@@ -231,7 +237,7 @@ Legend: ✅ built · 🟨 mocked/partial · ❌ missing.
 
 | Stage | Status | What exists today | What's mocked | What's missing |
 |---|---|---|---|---|
-| **0 Landing** | ✅/🟨 | `/` with `ModeCard`; mode passed via `?mode=` query | — | Mode is a **label only** downstream — does not yet truly fork seeding/tone/notifications (§3 slide-fix requires genuine fork) |
+| **0 Landing** | ✅/🟨 | `/` with `ModeCard`; mode passed via `?mode=` query | — | **⚠️ P0 risk:** Mode is a **label only** downstream — does not yet truly fork seeding/tone/notifications (§3 slide-fix requires genuine fork). This is the mechanic behind §5 "reads the room," the most differentiated demo beat — see the reordered build order below |
 | **1 Singpass/MyInfo** | ❌ | — | — | **Entire stage.** No `/consent` screen, no `/auth/singpass`, no `/myinfo/consent`, no sandbox wiring, no delegation handling |
 | **2 Conversation/Profile** | 🟨 | `/chat`, `useChatState` → `POST /chat`, live `LiveCareProfile` panel | Profile **pre-seeded with Mdm Tan mock** on load; transcript seeded from `mockMessages` | MyInfo-seeded means-tested fields; **Guardian** (no service); **server-side session** (state currently in `sessionStorage`); **Mr Lim seed**; SSE streaming (currently single JSON response); model is Gemini not Claude |
 | **3 Pathway** | 🟨 | `/pathway` calls `POST /pathway` (Gemini) | Falls back to `mockCareProfile`; why-tags exist in `mock-data.ts` | Server session (reads from `sessionStorage`, not a session store); Guardian provenance; **"SACH polyclinic" naming bug present** in `lib/mock-data.ts` |
@@ -255,12 +261,12 @@ Calendar real anchors (Stage 4)** — are exactly the parts not yet built.
 
 1. **Backend skeleton + session + Guardian service** (unblocks everything; design spec §10.1–2).
 2. **Stage 1 — Singpass/MyInfo sandbox** (`/consent`, `/auth/singpass`, `/myinfo/consent`) — the "zero forms" proof.
-3. **Stage 2 wired to session + MyInfo seeding + SSE** (move off `sessionStorage`; add Mr Lim seed).
+3. **Stage 2 wired to session + MyInfo seeding + SSE** (move off `sessionStorage`; add Mr Lim seed) **+ make the mode fork genuine here** (caregiver=Mdm Tan / self=Mr Lim seeding, tone, notifications) — *moved up from step 7 in the judge-review pass*, since this is the mechanic behind your most differentiated beat (§5) and is cheap relative to what follows.
 4. **Stage 3 from session + Guardian provenance** (+ apply the SACH naming fix).
 5. **Stage 4 — Autopilot backend: draft-then-confirm, 5 services, Guardian shield, SSE** + 🟢 **WhatsApp** + 🟢 **Google Calendar**.
 6. **Stage 5 — `/handover` Care Brief screen.**
-7. **Mode fork made genuine** (caregiver=Mdm Tan / self=Mr Lim seeding, tone, notifications).
-8. **Claude-on-Vertex swap** + k8s manifests + rehearsal.
+7. **k8s manifests + rehearsal** (include a dry run of the contingency plan in §9 below).
+8. **Claude-on-Vertex swap** — *optional, best-effort.* If it doesn't land in time, demo runs on Gemini; quietly drop "Claude Sonnet 4.6" from talking points for demo day rather than implying a swap happened on stage if it didn't.
 
 ---
 
@@ -285,6 +291,31 @@ With the longer slot you can show — not just narrate — the real anchors and 
 - *Whose Singpass for a caregiver?* → delegation; senior consents once at onboarding.
 - *Autopilot acting without permission?* → draft-then-confirm; only human-escalation bypasses confirm.
 - *Non-English speakers?* → multilingual is config, not re-engineering (LLM conversation + structured profile + per-template WhatsApp language codes).
+
+---
+
+## 9. Contingency plan — what to do if a live integration falters
+
+*Added in a judge-review pass (2026-06-17). Everything in §8 above is happy-path; this section
+covers what the team actually does if something doesn't cooperate live.*
+
+| Risk | Fallback |
+|---|---|
+| **Singpass/MyInfo sandbox is slow or down** at the very first live step | Have a pre-authenticated session ready to drop into, or a ~20s pre-recorded clip of the real consent screen, so the demo doesn't stall before anything has been shown |
+| **WhatsApp send fails or is delayed** during Autopilot | Narrate over a pre-captured screenshot/recording of a successful send rather than waiting live for a retry |
+| **Google Calendar invite doesn't land instantly** | Same — have a screenshot of a real prior invite ready as backup |
+| **Venue Wi-Fi/network issues** | Have a full recorded run-through ready as a last resort |
+
+**On the Mr Lim re-run (7:00–9:00 in §8):** two minutes is not enough to live-click through a
+full five-stage journey a second time at the same pace as Mdm Tan's run. Decide explicitly which
+screens get a full live pass for Mr Lim versus which get a fast verbal callout over the §5
+divergence table, and rehearse that exact cut rather than discovering the time crunch live.
+
+**On persona generalization:** both personas are bound 1:1 to demo modes for the sake of a clean
+script (§0, "Persona ↔ mode"). Before demo day, run at least one informal test of the underlying
+engine against a made-up third scenario (not part of the rehearsed run) to find out whether it
+actually generalizes — so the team knows, rather than discovers live, whether a judge improvising
+a different scenario in Q&A would break it.
 
 ---
 

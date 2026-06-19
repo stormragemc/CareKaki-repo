@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+const MiniMap = dynamic(() => import("./MiniMap"), { ssr: false });
 
 interface RecommendedService {
   name: string;
   address: string;
   postal_code: string;
+  latitude: number;
+  longitude: number;
   distance_km: number | null;
   match_score: number;
   total_score: number;
@@ -24,6 +29,9 @@ type Phase =
   | { step: "searching" }
   | { step: "done"; data: AICResponse };
 
+const USER_LAT = 1.3521;
+const USER_LNG = 103.8198;
+
 export default function AICFeed() {
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
 
@@ -41,8 +49,8 @@ export default function AICFeed() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             care_need,
-            latitude: 1.3521,
-            longitude: 103.8198,
+            latitude: USER_LAT,
+            longitude: USER_LNG,
             limit: 5,
           }),
         });
@@ -59,49 +67,49 @@ export default function AICFeed() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Step 1: classify */}
       {phase.step !== "idle" && (
         <StepRow
           done={phase.step !== "classifying"}
-          text={
-            phase.step === "classifying"
-              ? "Classifying care need…"
-              : "Care need classified"
-          }
+          text={phase.step === "classifying" ? "Classifying care need…" : "Care need classified"}
         />
       )}
 
-      {/* Step 2: search */}
       {(phase.step === "searching" || phase.step === "done") && (
         <StepRow
           done={phase.step === "done"}
-          text={
-            phase.step === "searching"
-              ? "Searching eldercare services…"
-              : "Search complete"
-          }
+          text={phase.step === "searching" ? "Searching eldercare services…" : "Search complete"}
         />
       )}
 
-      {/* Keywords used */}
       {phase.step === "done" && (
-        <div className="flex flex-wrap gap-1 px-2 py-1">
-          {phase.data.keywords_used.map((kw) => (
-            <span
-              key={kw}
-              className="text-[10px] px-2 py-0.5 rounded-full bg-brand-teal/20 text-brand-teal"
-            >
-              {kw}
-            </span>
-          ))}
-        </div>
-      )}
+        <>
+          <div className="flex flex-wrap gap-1 px-2 py-1">
+            {phase.data.keywords_used.map((kw) => (
+              <span key={kw} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-teal/20 text-brand-teal">
+                {kw}
+              </span>
+            ))}
+          </div>
 
-      {/* Results */}
-      {phase.step === "done" &&
-        phase.data.recommended_services.map((svc, i) => (
-          <ServiceCard key={i} rank={i + 1} service={svc} />
-        ))}
+          <MiniMap
+            center={{ lat: USER_LAT, lng: USER_LNG }}
+            markers={phase.data.recommended_services.map((svc, i) => ({
+              lat: svc.latitude,
+              lng: svc.longitude,
+              label: svc.name,
+              rank: i + 1,
+              address: svc.address,
+              distance_km: svc.distance_km,
+              postal_code: svc.postal_code,
+              extra: `Match score: ${svc.match_score} · Total: ${svc.total_score}`,
+            }))}
+          />
+
+          {phase.data.recommended_services.map((svc, i) => (
+            <ServiceCard key={i} rank={i + 1} service={svc} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -119,13 +127,7 @@ function StepRow({ done, text }: { done: boolean; text: string }) {
   );
 }
 
-function ServiceCard({
-  rank,
-  service,
-}: {
-  rank: number;
-  service: RecommendedService;
-}) {
+function ServiceCard({ rank, service }: { rank: number; service: RecommendedService }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 flex flex-col gap-1.5">
       <div className="flex items-start justify-between gap-2">
@@ -133,26 +135,16 @@ function ServiceCard({
           <span className="shrink-0 w-5 h-5 rounded-full bg-brand-teal/20 text-brand-teal text-[10px] font-bold flex items-center justify-center">
             {rank}
           </span>
-          <span className="text-xs font-semibold text-white truncate">
-            {service.name}
-          </span>
+          <span className="text-xs font-semibold text-white truncate">{service.name}</span>
         </div>
         {service.distance_km != null && (
-          <span className="shrink-0 text-[10px] text-white/40">
-            {service.distance_km} km
-          </span>
+          <span className="shrink-0 text-[10px] text-white/40">{service.distance_km} km</span>
         )}
       </div>
-      <span className="text-[11px] text-white/50 leading-snug pl-7">
-        {service.address}
-      </span>
+      <span className="text-[11px] text-white/50 leading-snug pl-7">{service.address}</span>
       <div className="flex items-center gap-3 pl-7">
-        <span className="text-[10px] text-white/30">
-          Postal {service.postal_code}
-        </span>
-        <span className="text-[10px] text-white/30">
-          Score {service.total_score}
-        </span>
+        <span className="text-[10px] text-white/30">Postal {service.postal_code}</span>
+        <span className="text-[10px] text-white/30">Score {service.total_score}</span>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+const MiniMap = dynamic(() => import("./MiniMap"), { ssr: false });
 
 interface Slot {
   date: string;
@@ -14,6 +17,8 @@ interface Provider {
   postal_code: string;
   phone: string;
   programmes: string[];
+  latitude: number;
+  longitude: number;
   distance_km: number | null;
   match_score: number;
   total_score: number;
@@ -33,6 +38,9 @@ type Phase =
   | { step: "checking_slots" }
   | { step: "done"; data: NursingResponse };
 
+const USER_LAT = 1.3521;
+const USER_LNG = 103.8198;
+
 export default function NursingFeed() {
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
 
@@ -45,8 +53,8 @@ export default function NursingFeed() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             care_need: "Elderly patient needs post-fall home nursing care",
-            latitude: 1.3521,
-            longitude: 103.8198,
+            latitude: USER_LAT,
+            longitude: USER_LNG,
             limit: 3,
           }),
         });
@@ -78,10 +86,28 @@ export default function NursingFeed() {
         />
       )}
 
-      {phase.step === "done" &&
-        phase.data.recommended_providers.map((prov, i) => (
-          <ProviderCard key={i} rank={i + 1} provider={prov} />
-        ))}
+      {phase.step === "done" && (
+        <>
+          <MiniMap
+            center={{ lat: USER_LAT, lng: USER_LNG }}
+            markers={phase.data.recommended_providers.map((prov, i) => ({
+              lat: prov.latitude,
+              lng: prov.longitude,
+              label: prov.name,
+              rank: i + 1,
+              address: prov.address,
+              distance_km: prov.distance_km,
+              postal_code: prov.postal_code,
+              phone: prov.phone,
+              extra: prov.programmes.join(", "),
+            }))}
+          />
+
+          {phase.data.recommended_providers.map((prov, i) => (
+            <ProviderCard key={i} rank={i + 1} provider={prov} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -102,24 +128,18 @@ function StepRow({ done, text }: { done: boolean; text: string }) {
 function ProviderCard({ rank, provider }: { rank: number; provider: Provider }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 flex flex-col gap-2">
-      {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center">
             {rank}
           </span>
-          <span className="text-xs font-semibold text-white truncate">
-            {provider.name}
-          </span>
+          <span className="text-xs font-semibold text-white truncate">{provider.name}</span>
         </div>
         {provider.distance_km != null && (
-          <span className="shrink-0 text-[10px] text-white/40">
-            {provider.distance_km} km
-          </span>
+          <span className="shrink-0 text-[10px] text-white/40">{provider.distance_km} km</span>
         )}
       </div>
 
-      {/* Address + phone */}
       <div className="pl-7 flex flex-col gap-0.5">
         <span className="text-[11px] text-white/50 leading-snug">{provider.address}</span>
         {provider.phone && (
@@ -127,37 +147,25 @@ function ProviderCard({ rank, provider }: { rank: number; provider: Provider }) 
         )}
       </div>
 
-      {/* Programme tags */}
       <div className="pl-7 flex flex-wrap gap-1">
         {provider.programmes.map((p) => (
-          <span
-            key={p}
-            className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40"
-          >
+          <span key={p} className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40">
             {p}
           </span>
         ))}
       </div>
 
-      {/* Available slots */}
       <div className="pl-7 flex flex-col gap-1">
-        <span className="text-[10px] text-white/30 uppercase tracking-wider">
-          Available slots
-        </span>
+        <span className="text-[10px] text-white/30 uppercase tracking-wider">Available slots</span>
         {provider.available_slots.map((slot, i) => (
           <div key={i} className="flex items-center gap-2">
             <span className="w-1 h-1 rounded-full bg-green-400 shrink-0" />
-            <span className="text-[11px] text-white/70">
-              {slot.date} · {slot.time}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
-              {slot.type}
-            </span>
+            <span className="text-[11px] text-white/70">{slot.date} · {slot.time}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">{slot.type}</span>
           </div>
         ))}
       </div>
 
-      {/* Booking status */}
       <div className="pl-7 flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
         <span className="text-[10px] text-amber-400/80">Tentative booking</span>

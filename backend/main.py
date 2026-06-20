@@ -207,6 +207,8 @@ def get_telegram_log():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
+    last_message = request.messages[-1].content
+
     # Main chat response
     chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
     chat_resp = oai.chat.completions.create(

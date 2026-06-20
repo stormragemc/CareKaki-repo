@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import type { Message, CareProfile } from "@/lib/types";
+import { useState, useCallback, useEffect, useRef } from "react";
+import type { Message, CareProfile, ProfileMeta } from "@/lib/types";
 
 const emptyProfile: CareProfile = {
   name: "",
@@ -14,9 +14,13 @@ const emptyProfile: CareProfile = {
   recentEvent: "",
 };
 
-function loadInitialState(): { messages: Message[]; profile: CareProfile } {
+function loadInitialState(): {
+  messages: Message[];
+  profile: CareProfile;
+  profileMeta: ProfileMeta;
+} {
   if (typeof window === "undefined") {
-    return { messages: [], profile: emptyProfile };
+    return { messages: [], profile: emptyProfile, profileMeta: {} };
   }
 
   const demoUserStr = sessionStorage.getItem("demoUser");
@@ -30,7 +34,11 @@ function loadInitialState(): { messages: Message[]; profile: CareProfile } {
           content: m.content,
         })
       );
-      return { messages: msgs, profile: demoUser.profile };
+      return {
+        messages: msgs,
+        profile: demoUser.profile,
+        profileMeta: demoUser.profileMeta ?? {},
+      };
     } catch {}
   }
 
@@ -43,21 +51,46 @@ function loadInitialState(): { messages: Message[]; profile: CareProfile } {
     content: "Hi — tell me about the person you're caring for. What just happened?",
   };
 
-  return { messages: [greeting], profile };
+  return { messages: [greeting], profile, profileMeta: {} };
 }
 
 export function useChatState() {
   const [initial] = useState(loadInitialState);
   const [messages, setMessages] = useState<Message[]>(initial.messages);
   const [profile, setProfile] = useState<CareProfile>(initial.profile);
+  const [profileMeta, setProfileMeta] = useState<ProfileMeta>(initial.profileMeta);
   const [isProfileUpdating, setIsProfileUpdating] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [emergency, setEmergency] = useState(false);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem("careProfile", JSON.stringify(profile));
   }, [profile]);
+
+  // The "just updated" ring plays once (~1.8s), then settles — for both the
+  // seeded persona field and each live profileUpdate patch (see spec §1, §7).
+  const scheduleClearPulse = useCallback(() => {
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    clearTimer.current = setTimeout(() => {
+      setProfileMeta((prev) => {
+        const next: ProfileMeta = {};
+        for (const k of Object.keys(prev) as (keyof CareProfile)[]) {
+          const meta = prev[k];
+          if (meta) next[k] = { ...meta, justUpdated: false };
+        }
+        return next;
+      });
+    }, 1800);
+  }, []);
+
+  useEffect(() => {
+    scheduleClearPulse();
+    return () => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+    };
+  }, [scheduleClearPulse]);
 
   const updateProfile = useCallback(
     (patch: Partial<CareProfile>) =>
@@ -96,6 +129,16 @@ export function useChatState() {
 
       if (data.profileUpdate && Object.keys(data.profileUpdate).length > 0) {
         updateProfile(data.profileUpdate);
+        setProfileMeta((prev) => {
+          const next = { ...prev };
+          for (const key of Object.keys(data.profileUpdate) as (keyof CareProfile)[]) {
+            // MyInfo-verified fields are never editable from chat — keep their
+            // source; everything else patched here came from the conversation.
+            next[key] = { source: prev[key]?.source ?? "chat", justUpdated: true };
+          }
+          return next;
+        });
+        scheduleClearPulse();
       }
       if (data.emergency) {
         sessionStorage.setItem("autopilotAdapters", JSON.stringify(data.adapters));
@@ -113,11 +156,12 @@ export function useChatState() {
       setIsThinking(false);
       setIsProfileUpdating(false);
     }
-  }, [messages, updateProfile]);
+  }, [messages, updateProfile, scheduleClearPulse]);
 
   return {
     messages,
     profile,
+    profileMeta,
     isProfileUpdating,
     isThinking,
     inputValue,

@@ -2,8 +2,10 @@
 Integration tests for the FastAPI application (main.py).
 
 Uses FastAPI's TestClient so no live server is needed.
-The google.generativeai SDK is stubbed in conftest.py; Telegram HTTP calls are
-patched per-test so the suite runs fully offline.
+main.py constructs the OpenAI client lazily (oai = None when OPENAI_API_KEY is
+absent), so tests that cover offline-mode behaviour need no mocking at all.
+Tests that exercise LLM-backed paths mock main.oai directly.
+Telegram HTTP calls are patched per-test so the suite runs fully offline.
 """
 
 import json
@@ -18,19 +20,32 @@ client = TestClient(main.app)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _gemini_response(text: str) -> MagicMock:
-    """Minimal mock that looks like a Gemini GenerateContentResponse."""
+def _openai_response(text: str) -> MagicMock:
+    """Minimal mock that looks like an OpenAI chat-completion response."""
+    choice = MagicMock()
+    choice.message.content = text
     mock = MagicMock()
-    mock.text = text
+    mock.choices = [choice]
     return mock
+
+
+def _with_oai(fn):
+    """Decorator: temporarily give main.oai a mock OpenAI client."""
+    def wrapper(*args, **kwargs):
+        original = main.oai
+        main.oai = MagicMock()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            main.oai = original
+    return wrapper
 
 
 # ── health check ──────────────────────────────────────────────────────────────
 
 class TestHealthCheck:
     def test_returns_200(self):
-        resp = client.get("/")
-        assert resp.status_code == 200
+        assert client.get("/").status_code == 200
 
     def test_returns_running_status(self):
         assert client.get("/").json()["status"] == "Backend running"
@@ -55,80 +70,153 @@ class TestLogEndpoints:
         assert isinstance(resp.json()["log"], list)
 
 
-# ── /chat ─────────────────────────────────────────────────────────────────────
+# ── /chat — offline mode (oai=None) ──────────────────────────────────────────
 
-class TestChatEndpoint:
-    def test_returns_content_and_profile_update(self):
-        session = MagicMock()
-        session.send_message.return_value = _gemini_response("I can help with that.")
-        main.chat_model.start_chat.return_value = session
-        main.extraction_model.generate_content.return_value = _gemini_response(
-            json.dumps({"name": "Mdm Tan", "age": 78})
-        )
+class TestChatEndpointOffline:
+    def setup_method(self):
+        self._original_oai = main.oai
+        main.oai = None
 
+    def teardown_method(self):
+        main.oai = self._original_oai
+
+    def test_offline_returns_200(self):
         resp = client.post("/chat", json={
             "messages": [{"role": "user", "content": "My mum had a fall"}]
         })
         assert resp.status_code == 200
+
+    def test_offline_response_has_required_keys(self):
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "My mum had a fall"}]
+        })
         body = resp.json()
         assert "content" in body
         assert "profileUpdate" in body
+        assert "emergency" in body
+        assert "adapters" in body
 
-    def test_profile_update_is_dict(self):
-        session = MagicMock()
-        session.send_message.return_value = _gemini_response("Let me check.")
-        main.chat_model.start_chat.return_value = session
-        main.extraction_model.generate_content.return_value = _gemini_response(
-            json.dumps({"age": 82})
-        )
-
-        resp = client.post("/chat", json={
-            "messages": [{"role": "user", "content": "He is 82 years old"}]
-        })
-        assert isinstance(resp.json()["profileUpdate"], dict)
-
-    def test_malformed_extraction_returns_empty_dict(self):
-        session = MagicMock()
-        session.send_message.return_value = _gemini_response("Okay.")
-        main.chat_model.start_chat.return_value = session
-        main.extraction_model.generate_content.return_value = _gemini_response("not-json{{")
-
+    def test_offline_profile_update_is_empty(self):
         resp = client.post("/chat", json={
             "messages": [{"role": "user", "content": "hello"}]
         })
-        assert resp.status_code == 200
         assert resp.json()["profileUpdate"] == {}
+
+    def test_emergency_detected_in_offline_mode(self):
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "My uncle collapsed and is unresponsive!"}]
+        })
+        body = resp.json()
+        assert body["emergency"] is True
+        assert len(body["adapters"]) > 0
+
+    def test_non_emergency_message_not_flagged(self):
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "I need some general help for my mum"}]
+        })
+        assert resp.json()["emergency"] is False
 
     def test_missing_messages_returns_422(self):
         assert client.post("/chat", json={}).status_code == 422
 
 
+# ── /chat — online mode (mocked oai) ─────────────────────────────────────────
+
+class TestChatEndpointOnline:
+    def setup_method(self):
+        self._original_oai = main.oai
+        main.oai = MagicMock()
+
+    def teardown_method(self):
+        main.oai = self._original_oai
+
+    def test_returns_assistant_content(self):
+        main.oai.chat.completions.create.side_effect = [
+            _openai_response("How can I help?"),
+            _openai_response(json.dumps({"name": "Mdm Tan", "age": 78})),
+        ]
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "My mum (78) had a fall"}]
+        })
+        assert resp.status_code == 200
+        assert "content" in resp.json()
+
+    def test_profile_update_returned(self):
+        main.oai.chat.completions.create.side_effect = [
+            _openai_response("Okay."),
+            _openai_response(json.dumps({"age": 82})),
+        ]
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "He is 82 years old"}]
+        })
+        assert isinstance(resp.json()["profileUpdate"], dict)
+
+    def test_malformed_extraction_json_returns_empty_dict(self):
+        main.oai.chat.completions.create.side_effect = [
+            _openai_response("Noted."),
+            _openai_response("not-json{{"),
+        ]
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "hello"}]
+        })
+        assert resp.json()["profileUpdate"] == {}
+
+    def test_guardian_flags_included_in_response(self):
+        main.oai.chat.completions.create.side_effect = [
+            _openai_response("Here is my advice."),
+            _openai_response(json.dumps({})),
+        ]
+        resp = client.post("/chat", json={
+            "messages": [{"role": "user", "content": "help please"}]
+        })
+        assert "guardian" in resp.json()
+        assert "flags" in resp.json()["guardian"]
+
+
 # ── /pathway ──────────────────────────────────────────────────────────────────
 
 class TestPathwayEndpoint:
-    def test_returns_columns_list(self):
-        columns = [
-            {"id": "week1", "timeframe": "THIS WEEK", "title": "Immediate Support",
-             "colorScheme": "orange", "items": ["Call AIC", "Check meds", "Visit GP"],
-             "whyThisForYou": "Recent fall requires immediate attention."},
-        ]
-        main.chat_model.generate_content.return_value = _gemini_response(json.dumps(columns))
+    def test_no_api_key_returns_empty_columns(self):
+        original = main.oai
+        main.oai = None
+        try:
+            resp = client.post("/pathway", json={"profile": {"name": "Mdm Tan"}})
+            assert resp.status_code == 200
+            assert resp.json()["columns"] == []
+        finally:
+            main.oai = original
 
-        resp = client.post("/pathway", json={"profile": {
-            "name": "Mdm Tan", "age": 78, "living": "Alone",
-            "mobility": "Walker", "conditions": "Hypertension",
-            "caregiver": "Daughter", "financialTier": "Full subsidy",
-            "recentEvent": "Fell at home",
-        }})
-        assert resp.status_code == 200
-        assert isinstance(resp.json()["columns"], list)
+    def test_with_oai_returns_columns(self):
+        original = main.oai
+        main.oai = MagicMock()
+        columns = [
+            {"id": "week1", "timeframe": "THIS WEEK", "title": "Support",
+             "colorScheme": "orange", "items": ["a", "b", "c"],
+             "whyThisForYou": "Recent fall."},
+        ]
+        main.oai.chat.completions.create.return_value = _openai_response(json.dumps(columns))
+        try:
+            resp = client.post("/pathway", json={"profile": {
+                "name": "Mdm Tan", "age": 78, "living": "Alone",
+                "mobility": "Walker", "conditions": "Hypertension",
+                "caregiver": "Daughter", "financialTier": "Full subsidy",
+                "recentEvent": "Fell at home",
+            }})
+            assert resp.status_code == 200
+            assert isinstance(resp.json()["columns"], list)
+        finally:
+            main.oai = original
 
     def test_malformed_json_returns_empty_columns(self):
-        main.chat_model.generate_content.return_value = _gemini_response("not json")
-
-        resp = client.post("/pathway", json={"profile": {}})
-        assert resp.status_code == 200
-        assert resp.json()["columns"] == []
+        original = main.oai
+        main.oai = MagicMock()
+        main.oai.chat.completions.create.return_value = _openai_response("not json")
+        try:
+            resp = client.post("/pathway", json={"profile": {}})
+            assert resp.status_code == 200
+            assert resp.json()["columns"] == []
+        finally:
+            main.oai = original
 
     def test_missing_profile_returns_422(self):
         assert client.post("/pathway", json={}).status_code == 422
@@ -271,25 +359,38 @@ class TestIccpHandover:
 # ── /guardian/check ───────────────────────────────────────────────────────────
 
 class TestGuardianEndpoint:
-    def test_benign_message_is_allowed(self):
+    def test_benign_message_passes(self):
         resp = client.post("/guardian/check", json={"text": "My mum needs a nurse at home"})
         assert resp.status_code == 200
-        assert resp.json()["decision"] == "allow"
+        body = resp.json()
+        assert body["passed"] is True
+        assert body["flag_count"] == 0
 
-    def test_medical_advice_is_blocked(self):
-        resp = client.post("/guardian/check", json={"text": "Should I increase her metformin dosage?"})
+    def test_nric_is_redacted(self):
+        resp = client.post("/guardian/check", json={"text": "My NRIC is S1234567D"})
         assert resp.status_code == 200
         body = resp.json()
-        assert body["decision"] == "block"
-        assert body["category"] == "medical_advice"
+        assert body["original_redacted"] is True
+        assert "S1234567D" not in body["safe_text"]
 
-    def test_nric_is_blocked_and_redacted(self):
-        resp = client.post("/guardian/check", json={"text": "My NRIC is S1234567D please help"})
+    def test_medical_advice_adds_disclaimer(self):
+        resp = client.post("/guardian/check", json={"text": "He should take 500mg paracetamol now"})
         assert resp.status_code == 200
         body = resp.json()
-        assert body["decision"] == "block"
-        assert body["category"] == "pii"
-        assert "S1234567D" not in body["redacted"]
+        assert body["medical_disclaimer"] is not None
+
+    def test_risky_action_requires_confirmation(self):
+        resp = client.post("/guardian/check", json={"text": "Please escalate this case now"})
+        assert resp.status_code == 200
+        assert resp.json()["requires_confirmation"] is True
+
+    def test_response_always_has_safe_text(self):
+        resp = client.post("/guardian/check", json={"text": "hello"})
+        assert "safe_text" in resp.json()
+
+    def test_adapter_name_accepted(self):
+        resp = client.post("/guardian/check", json={"text": "help", "adapter_name": "chat"})
+        assert resp.status_code == 200
 
     def test_missing_text_returns_422(self):
         assert client.post("/guardian/check", json={}).status_code == 422
@@ -332,23 +433,45 @@ class TestTelegramWebhook:
         assert "ICCP" in sent_text or "coordinator" in sent_text.lower()
 
     @patch("main.send_telegram_message")
-    def test_free_text_triggers_classification(self, _mock_send):
-        main.extraction_model.generate_content.return_value = _gemini_response(json.dumps({
+    def test_free_text_offline_sends_ack(self, mock_send):
+        original = main.oai
+        main.oai = None
+        try:
+            resp = client.post("/telegram/webhook", json={
+                "message": {
+                    "text": "I'm coming in 15 minutes",
+                    "chat": {"id": 555},
+                    "from": {"first_name": "Mei"},
+                }
+            })
+            assert resp.json()["ok"] is True
+            mock_send.assert_called()
+        finally:
+            main.oai = original
+
+    @patch("main.send_telegram_message")
+    def test_free_text_online_returns_classification(self, _mock_send):
+        original = main.oai
+        main.oai = MagicMock()
+        main.oai.chat.completions.create.return_value = _openai_response(json.dumps({
             "intent": "caregiver_responding",
             "status": "on_the_way",
             "eta_minutes": 15,
             "extra_request": None,
             "urgency": "medium",
         }))
-        resp = client.post("/telegram/webhook", json={
-            "message": {
-                "text": "I'm coming in 15 minutes",
-                "chat": {"id": 555},
-                "from": {"first_name": "Mei"},
-            }
-        })
-        assert resp.json()["ok"] is True
-        assert "classification" in resp.json()
+        try:
+            resp = client.post("/telegram/webhook", json={
+                "message": {
+                    "text": "I'm coming in 15 minutes",
+                    "chat": {"id": 555},
+                    "from": {"first_name": "Mei"},
+                }
+            })
+            assert resp.json()["ok"] is True
+            assert "classification" in resp.json()
+        finally:
+            main.oai = original
 
 
 # ── /iccp/webhook ────────────────────────────────────────────────────────────

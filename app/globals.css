@@ -2,8 +2,9 @@
 
 /* Design tokens + animations (see docs/themes/implementation-spec.md §3).
    Everything lives in @theme so it surfaces as Tailwind utilities:
-   colors → bg-*/text-*/border-*, animations → animate-*. Base body styling
-   (bg-cream text-ink text-lg) is applied via Tailwind classes in app/layout.tsx. */
+   colors generate bg-, text- and border- utilities; animations generate animate-.
+   Base body styling (bg-cream text-ink text-lg) is applied via Tailwind classes
+   in app/layout.tsx. */
 @theme {
   /* neutrals / canvas */
   --color-cream: #FBF7F1;
@@ -84,5 +85,29 @@
   @keyframes slideUp {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
+  }
+}
+
+/* ── Accessibility base (spec §8) ─────────────────────────────────────────────
+   Visible keyboard focus on every interactive (self-orange reads on both the
+   cream and the dark autopilot worlds). Elements that opt out with `outline-none`
+   provide their own focus cue (e.g. focus:border-self on inputs). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-self);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* The "just updated" pulse and crossfades are decorative — honour reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

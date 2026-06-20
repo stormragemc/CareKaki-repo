@@ -36,13 +36,17 @@ function ConsentInner() {
 
   useEffect(() => {
     const raw = sessionStorage.getItem("demoUser");
+    let parsed: DemoUser | null = null;
     if (raw) {
       try {
-        setDemoUser(JSON.parse(raw) as DemoUser);
+        parsed = JSON.parse(raw) as DemoUser;
       } catch {
-        setDemoUser(null);
+        parsed = null;
       }
     }
+    // sessionStorage is client-only; reading it after mount keeps SSR/hydration in sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDemoUser(parsed);
   }, []);
 
   // mode is the cosmetic URL label; fall back to the persona's role, then caregiver.

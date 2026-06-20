@@ -25,7 +25,8 @@ const profileRows: { key: keyof CareProfile; label: string }[] = [
 function fieldValue(profile: CareProfile, key: keyof CareProfile): string {
   const raw = profile[key];
   if (key === "age") return raw ? String(raw) : "";
-  return String(raw ?? "");
+  // Normalize comma spacing so list values read "a, b" instead of "a,b".
+  return String(raw ?? "").replace(/\s*,\s*/g, ", ");
 }
 
 function FieldList({ profile, profileMeta, mode }: LiveCareProfileProps) {

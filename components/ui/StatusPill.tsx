@@ -32,7 +32,7 @@ export default function StatusPill({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[status]}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[status]}`}
     >
       {status === "running" && (
         <span className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" aria-hidden="true" />

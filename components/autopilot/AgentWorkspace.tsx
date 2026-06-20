@@ -28,22 +28,31 @@ const ALL_PANELS: PanelDef[] = [
   { id: "telegram", title: "Telegram", subtitle: "Caregiver alert", sources: ["Telegram Bot API"], liveLabel: "Caregiver alert" },
 ];
 
+const ALL_PANEL_IDS = ALL_PANELS.map((p) => p.id);
+
+// Single source of truth for which services Autopilot is actually running.
+// The emergency flow seeds `autopilotAdapters` (from the backend's plan_adapters);
+// honour it so the count + tiles only reflect what this situation needs.
+export function resolveActivePanelIds(): PanelId[] {
+  if (typeof window === "undefined") return ALL_PANEL_IDS;
+  try {
+    const stored = sessionStorage.getItem("autopilotAdapters");
+    if (stored) {
+      const ids = (JSON.parse(stored) as PanelId[]).filter((id) => ALL_PANEL_IDS.includes(id));
+      if (ids.length > 0) return ids;
+    }
+  } catch {}
+  return ALL_PANEL_IDS;
+}
+
 export default function AgentWorkspace({ approved }: { approved: boolean }) {
   const [expanded, setExpanded] = useState<PanelId | null>(null);
-  const [activeIds, setActiveIds] = useState<PanelId[]>(ALL_PANELS.map((p) => p.id));
+  const [activeIds, setActiveIds] = useState<PanelId[]>(ALL_PANEL_IDS);
 
-  // The emergency flow seeds `autopilotAdapters` (from the backend's plan_adapters);
-  // honour it so Autopilot only shows the services this situation actually needs.
   useEffect(() => {
-    const stored = sessionStorage.getItem("autopilotAdapters");
-    if (!stored) return;
-    try {
-      const ids = JSON.parse(stored) as PanelId[];
-      if (ids.length > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setActiveIds(ids);
-      }
-    } catch {}
+    // sessionStorage is client-only; resolve after mount to keep SSR/hydration in sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveIds(resolveActivePanelIds());
   }, []);
 
   const panels = ALL_PANELS.filter((p) => activeIds.includes(p.id));

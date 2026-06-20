@@ -5,14 +5,14 @@ import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import GuardianBand from "@/components/ui/GuardianBand";
-import AgentWorkspace from "@/components/autopilot/AgentWorkspace";
+import AgentWorkspace, { resolveActivePanelIds } from "@/components/autopilot/AgentWorkspace";
 import { loadDemoUser, loadCareProfile } from "@/lib/session";
-
-const SERVICE_COUNT = 5; // 5 services + Guardian wrapper — Guardian is never a tile.
 
 export default function AutopilotPage() {
   const [name, setName] = useState("");
   const [approved, setApproved] = useState(false);
+  // Count reflects the services this case actually needs, not a fixed 5.
+  const [serviceCount, setServiceCount] = useState(resolveActivePanelIds().length);
 
   useEffect(() => {
     const user = loadDemoUser();
@@ -20,6 +20,8 @@ export default function AutopilotPage() {
     // sessionStorage is client-only; reading it after mount keeps SSR/hydration in sync.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(user?.name ?? profile?.name ?? "your loved one");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setServiceCount(resolveActivePanelIds().length);
   }, []);
 
   return (
@@ -34,7 +36,7 @@ export default function AutopilotPage() {
                 Autopilot
               </span>
               <span className="text-xs text-autopilot-muted">
-                {SERVICE_COUNT} services {approved ? "running" : "drafted"} for {name}
+                {serviceCount} {serviceCount === 1 ? "service" : "services"} {approved ? "running" : "drafted"} for {name}
               </span>
             </span>
           </Link>
@@ -53,7 +55,7 @@ export default function AutopilotPage() {
 
       {/* Guardian wraps everything Autopilot runs, then the live workspace */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 overflow-hidden">
-        <GuardianBand theme="dark" count={SERVICE_COUNT} />
+        <GuardianBand theme="dark" count={serviceCount} />
         <div className="flex-1 overflow-hidden">
           <AgentWorkspace approved={approved} />
         </div>
@@ -65,7 +67,7 @@ export default function AutopilotPage() {
           {approved ? (
             <>
               <p className="text-sm text-autopilot-muted">
-                All {SERVICE_COUNT} running under Guardian · each service is executing its own live flow.
+                All {serviceCount} running under Guardian · each service is executing its own live flow.
               </p>
               <Link
                 href="/handover"
@@ -77,7 +79,7 @@ export default function AutopilotPage() {
           ) : (
             <>
               <p className="text-sm text-autopilot-muted">
-                {SERVICE_COUNT} services drafted · Guardian wrapping all {SERVICE_COUNT} · awaiting your approval
+                {serviceCount} services drafted · Guardian wrapping all {serviceCount} · awaiting your approval
                 <span className="block text-xs text-autopilot-muted/70">
                   Nothing irreversible runs until you approve. Reject to adjust the plan, or coordinator escalation may proceed to reach a human faster.
                 </span>

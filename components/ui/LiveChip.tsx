@@ -2,9 +2,12 @@
 export default function LiveChip({
   label,
   theme = "light",
+  compact = false,
 }: {
   label: string;
   theme?: "light" | "dark";
+  // When space is tight (collapsed cards) show just "LIVE" instead of the full label.
+  compact?: boolean;
 }) {
   const styles =
     theme === "dark"
@@ -13,10 +16,11 @@ export default function LiveChip({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles}`}
+      title={`LIVE · ${label}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles}`}
     >
       <span className="size-1.5 rounded-full bg-live-dot motion-safe:animate-pulse" aria-hidden="true" />
-      LIVE · {label}
+      {compact ? "LIVE" : `LIVE · ${label}`}
     </span>
   );
 }

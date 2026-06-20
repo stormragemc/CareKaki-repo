@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { ArrowRight } from "lucide-react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import LiveCareProfile from "@/components/chat/LiveCareProfile";
+import ModeChip from "@/components/ui/ModeChip";
+import TalkToHuman from "@/components/ui/TalkToHuman";
 import { useChatState } from "@/hooks/useChatState";
+
+const planButtonFill: Record<"self" | "caregiver", string> = {
+  self: "bg-self",
+  caregiver: "bg-caregiver",
+};
 
 function ChatPageInner() {
   const searchParams = useSearchParams();
@@ -15,7 +23,7 @@ function ChatPageInner() {
   const {
     messages,
     profile,
-    isProfileUpdating,
+    profileMeta,
     isThinking,
     inputValue,
     setInputValue,
@@ -29,35 +37,38 @@ function ChatPageInner() {
     }
   }, [emergency, router]);
 
-  const modeLabel =
-    mode === "caregiver" ? "Caregiver mode" : "Self mode";
-
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
-      {/* Sub-header: mode indicator + CTA to view pathway */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-brand-cream-border bg-brand-cream/80 text-xs text-gray-500">
-        <span className="font-medium text-gray-700">{modeLabel}</span>
-        <Link
-          href="/pathway"
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-brand-teal text-white font-semibold text-xs hover:opacity-90 transition-opacity"
-        >
-          View care plan →
-        </Link>
+    <div className="flex h-[calc(100vh-3.5rem)] flex-col bg-cream">
+      {/* Sub-header: mode chip + human escape hatch + pathway CTA */}
+      <div className="flex items-center justify-between gap-3 border-b border-hairline bg-surface px-4 py-2.5 sm:px-6">
+        <ModeChip mode={mode} />
+        <div className="flex items-center gap-2">
+          <TalkToHuman />
+          <Link
+            href="/pathway"
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 ${planButtonFill[mode]}`}
+          >
+            View care plan
+            <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </div>
       </div>
 
-      {/* Split layout: chat (left) + profile (right) */}
-      <div className="flex flex-1 gap-4 p-4 overflow-hidden">
-        <div className="flex-[3] min-w-0 overflow-hidden">
+      {/* Split layout: chat (left) | profile (right, cream). On mobile the
+          profile becomes a bottom pull-up sheet rendered by LiveCareProfile. */}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 border-r border-hairline md:flex-[1.32]">
           <ChatPanel
             messages={messages}
+            mode={mode}
             isThinking={isThinking}
             inputValue={inputValue}
             onInputChange={setInputValue}
             onSend={() => sendMessage(inputValue)}
           />
         </div>
-        <div className="flex-[2] min-w-0 overflow-hidden hidden md:block">
-          <LiveCareProfile profile={profile} isUpdating={isProfileUpdating} />
+        <div className="min-w-0 md:flex-1 md:overflow-hidden md:p-5">
+          <LiveCareProfile profile={profile} profileMeta={profileMeta} mode={mode} />
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
-import type { Message } from "@/lib/types";
+import type { CareMode, Message } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTEGRATION POINT — React Flow
@@ -22,6 +22,7 @@ import type { Message } from "@/lib/types";
 
 interface ChatPanelProps {
   messages: Message[];
+  mode: CareMode;
   isThinking: boolean;
   inputValue: string;
   onInputChange: (v: string) => void;
@@ -30,6 +31,7 @@ interface ChatPanelProps {
 
 export default function ChatPanel({
   messages,
+  mode,
   isThinking,
   inputValue,
   onInputChange,
@@ -42,24 +44,22 @@ export default function ChatPanel({
   }, [messages, isThinking]);
 
   return (
-    <div className="flex flex-col h-full bg-brand-cream/60 rounded-xl border border-brand-cream-border overflow-hidden">
-      {/* Chat label */}
-      <div className="px-4 py-3 border-b border-brand-cream-border">
-        <span className="text-sm font-semibold text-gray-700">Chat</span>
-      </div>
-
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 sm:px-6">
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage key={msg.id} message={msg} mode={mode} />
         ))}
 
         {isThinking && (
           <div className="flex justify-start">
-            <div className="flex gap-1 px-4 py-3 bg-[#EDE4D4] rounded-2xl rounded-tl-sm">
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+            <div className="flex items-center gap-2 rounded-[4px_18px_18px_18px] border border-hairline bg-surface px-4 py-3 text-sm text-ink-soft">
+              <span className="flex gap-1" aria-hidden="true">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted [animation-delay:300ms]" />
+              </span>
+              CareKaki is updating the profile…
             </div>
           </div>
         )}
@@ -68,11 +68,12 @@ export default function ChatPanel({
       </div>
 
       {/* Input */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 pt-2 sm:px-6">
         <ChatInput
           value={inputValue}
           onChange={onInputChange}
           onSend={onSend}
+          mode={mode}
           disabled={isThinking}
         />
       </div>

@@ -11,9 +11,9 @@ interface ICCPLogEntry {
 }
 
 const toneDot: Record<string, string> = {
-  default: "bg-white/30",
-  success: "bg-green-400",
-  pending: "bg-brand-orange animate-pulse",
+  default: "bg-autopilot-muted",
+  success: "bg-status-done-dark",
+  pending: "bg-status-running-dark animate-pulse",
 };
 
 const fromLabel: Record<string, string> = {
@@ -23,18 +23,19 @@ const fromLabel: Record<string, string> = {
 };
 
 const fromColor: Record<string, string> = {
-  system: "text-brand-teal",
-  bot: "text-blue-400",
-  user: "text-amber-400",
+  system: "text-live-dark",
+  bot: "text-weeks-soft",
+  user: "text-status-running-dark",
 };
 
-export default function ICCPFeed() {
+// ICCP may bypass the approval gate to escalate to a human faster.
+export default function ICCPFeed({ enabled = true }: { enabled?: boolean }) {
   const [log, setLog] = useState<ICCPLogEntry[]>([]);
   const [triggered, setTriggered] = useState(false);
 
   // Auto-trigger a demo handover on mount if log is empty
   useEffect(() => {
-    if (triggered) return;
+    if (!enabled || triggered) return;
 
     const trigger = async () => {
       setTriggered(true);
@@ -73,10 +74,11 @@ export default function ICCPFeed() {
     };
 
     trigger();
-  }, [triggered]);
+  }, [enabled, triggered]);
 
   // Poll the ICCP log
   useEffect(() => {
+    if (!enabled) return;
     const fetchLog = () => {
       fetch("http://localhost:8000/iccp/log")
         .then((res) => res.json())
@@ -87,14 +89,14 @@ export default function ICCPFeed() {
     fetchLog();
     const interval = setInterval(fetchLog, 1500);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
 
   if (log.length === 0) {
     return (
       <div className="flex flex-col gap-2 px-2 py-1">
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-          <span className="text-xs text-white/60">Detecting escalation need…</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-status-running-dark animate-pulse" />
+          <span className="text-xs text-autopilot-muted">Detecting escalation need…</span>
         </div>
       </div>
     );
@@ -105,7 +107,7 @@ export default function ICCPFeed() {
       {log.map((entry, i) => (
         <div
           key={i}
-          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/[0.03]"
+          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-autopilot-band"
         >
           <span
             className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${toneDot[entry.tone]}`}
@@ -115,15 +117,15 @@ export default function ICCPFeed() {
               <span className={`text-[10px] font-semibold ${fromColor[entry.from]}`}>
                 {fromLabel[entry.from] ?? entry.from}
               </span>
-              <span className="text-[10px] text-white/20">{entry.time}</span>
+              <span className="text-[10px] text-autopilot-muted">{entry.time}</span>
             </div>
-            <span className="text-xs text-white/80 leading-snug">{entry.text}</span>
+            <span className="text-xs text-autopilot-text leading-snug">{entry.text}</span>
             {entry.buttons && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {entry.buttons.map((label) => (
                   <span
                     key={label}
-                    className="text-[10px] px-2 py-0.5 rounded-full border border-white/20 text-white/60"
+                    className="text-[10px] px-2 py-0.5 rounded-full border border-autopilot-hairline text-autopilot-muted"
                   >
                     {label}
                   </span>

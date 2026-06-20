@@ -1,92 +1,73 @@
-import type { PathwayColumnData, PathwayColorScheme } from "@/lib/types";
+import type { Divergence, PathwayGroup, PathwayItem } from "@/lib/types";
+import WhyTag from "@/components/ui/WhyTag";
+import { groupMeta } from "./pathwayData";
 
-// ── Colour maps per scheme ────────────────────────────────────────────────────
-const topBar: Record<PathwayColorScheme, string> = {
-  orange: "bg-brand-orange",
-  blue:   "bg-brand-blue",
-  amber:  "bg-brand-amber",
-  teal:   "bg-brand-teal",
-};
-
-const timeframeText: Record<PathwayColorScheme, string> = {
-  orange: "text-brand-orange",
-  blue:   "text-brand-blue",
-  amber:  "text-brand-amber",
-  teal:   "text-brand-teal",
-};
-
-const bulletBg: Record<PathwayColorScheme, string> = {
-  orange: "bg-brand-orange",
-  blue:   "bg-brand-blue",
-  amber:  "bg-brand-amber",
-  teal:   "bg-brand-teal",
-};
-
-const whyBg: Record<PathwayColorScheme, string> = {
-  orange: "bg-brand-orange-light",
-  blue:   "bg-brand-blue-light",
-  amber:  "bg-brand-amber-light",
-  teal:   "bg-brand-teal-light",
-};
-
-const whyLabelText: Record<PathwayColorScheme, string> = {
-  orange: "text-brand-orange",
-  blue:   "text-brand-blue",
-  amber:  "text-brand-amber",
-  teal:   "text-brand-teal",
-};
-
-interface PathwayColumnProps {
-  column: PathwayColumnData;
+// DIFFERS / ELEVATED tag — flags a persona-specific change from the baseline
+// plan. Always carries a text label (never colour-only); ELEVATED leads with ★.
+function DivergenceTag({ divergence }: { divergence: Divergence }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-self bg-self-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-self-ink">
+      {divergence === "elevated" && <span aria-hidden="true">★</span>}
+      {divergence === "elevated" ? "Elevated" : "Differs"}
+    </span>
+  );
 }
 
-export default function PathwayColumn({ column }: PathwayColumnProps) {
-  const { timeframe, title, colorScheme, items, whyThisForYou } = column;
+function PathwayItemCard({
+  item,
+  group,
+}: {
+  item: PathwayItem;
+  group: PathwayGroup;
+}) {
+  // Single point of contact: a dark emphasis card with a plain descriptive line
+  // instead of a WhyTag pill.
+  if (item.highlight) {
+    return (
+      <div className="flex flex-col gap-1.5 rounded-[14px] bg-ink px-4 py-4 text-surface">
+        <h4 className="font-serif text-base font-semibold leading-snug">{item.title}</h4>
+        <p className="text-sm leading-snug text-surface/70">{item.whyTag}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col bg-white rounded-xl overflow-hidden border border-brand-cream-border shadow-sm">
-      {/* Coloured top bar */}
-      <div className={`h-1 w-full ${topBar[colorScheme]}`} />
+    <div
+      className={`flex flex-col gap-2.5 rounded-[14px] bg-surface px-4 py-3.5 ${
+        item.divergence ? "border-2 border-self" : "border border-hairline"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h4 className="text-[15px] font-semibold leading-snug text-ink">{item.title}</h4>
+        {item.divergence && <DivergenceTag divergence={item.divergence} />}
+      </div>
+      <div>
+        <WhyTag group={group}>{item.whyTag}</WhyTag>
+      </div>
+    </div>
+  );
+}
 
-      {/* Main content */}
-      <div className="flex flex-col flex-1 px-5 pt-5 pb-3 gap-3">
-        <span
-          className={`text-[10px] font-bold tracking-widest uppercase ${timeframeText[colorScheme]}`}
-        >
-          {timeframe}
-        </span>
+export default function PathwayColumn({
+  group,
+  items,
+}: {
+  group: PathwayGroup;
+  items: PathwayItem[];
+}) {
+  const { label, dot } = groupMeta[group];
 
-        <h3 className="font-serif font-bold text-xl text-gray-900 leading-snug">
-          {title}
-        </h3>
-
-        <ul className="flex flex-col gap-2.5 flex-1">
-          {items.map((item) => (
-            <li
-              key={item}
-              className="flex items-start gap-2.5 text-sm text-gray-700 leading-snug"
-            >
-              <span
-                className={`mt-[5px] w-1.5 h-1.5 shrink-0 rounded-full ${bulletBg[colorScheme]}`}
-                aria-hidden="true"
-              />
-              {item}
-            </li>
-          ))}
-        </ul>
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${dot}`} aria-hidden="true" />
+        <h3 className="text-sm font-bold tracking-wide text-ink">{label}</h3>
       </div>
 
-      {/* Why this for you */}
-      <div className="px-5 pb-5 pt-2">
-        <div className={`rounded-lg p-3 ${whyBg[colorScheme]}`}>
-          <p className="text-xs leading-snug">
-            <span className={`font-bold ${whyLabelText[colorScheme]}`}>
-              Why this for you
-            </span>
-            {"  "}
-            <span className="text-gray-600">{whyThisForYou}</span>
-          </p>
-        </div>
+      <div className="flex flex-col gap-2.5">
+        {items.map((item) => (
+          <PathwayItemCard key={item.id} item={item} group={group} />
+        ))}
       </div>
     </div>
   );

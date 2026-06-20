@@ -1,0 +1,57 @@
+# CareKaki — local full-stack run. Synthetic/demo data only; no real secrets required.
+#   web      → http://localhost:3000  (Next.js)
+#   backend  → http://localhost:8000  (FastAPI)
+# Browser-side fetches target http://localhost:8000 directly, so the backend port is
+# published to the host. The Guardian stub (POST /guardian/check) and health endpoint
+# work without any API keys; the LLM/Telegram routes are no-ops unless keys are supplied.
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: carekaki-backend
+    ports:
+      - "8000:8000"
+    # Optional keys (LLM/Telegram). Defaults keep the container booting with synthetic data.
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      ICCP_BOT_TELEGRAM_TOKEN: ${ICCP_BOT_TELEGRAM_TOKEN:-}
+      OPENFDA_API_TOKEN: ${OPENFDA_API_TOKEN:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/',timeout=3).status==200 else sys.exit(1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: carekaki-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

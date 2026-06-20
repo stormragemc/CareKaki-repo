@@ -11,7 +11,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Construct the client lazily: the OpenAI v1 client raises if no key is present,
+# which would block the whole server from booting. Without a key the server still
+# runs — Guardian, health, and the keyword-based emergency/adapter logic all work
+# offline; only the LLM-backed replies degrade gracefully.
+_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+oai = OpenAI(api_key=_OPENAI_API_KEY) if _OPENAI_API_KEY else None
 CHAT_MODEL = "gpt-4o-mini"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -209,28 +214,34 @@ def get_telegram_log():
 def chat(request: ChatRequest):
     last_message = request.messages[-1].content
 
-    # Main chat response
-    chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
-    chat_resp = oai.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=chat_messages,
-    )
-    reply = chat_resp.choices[0].message.content
-
-    # Profile extraction
-    conversation_text = "\n".join(
-        f"{m.role}: {m.content}" for m in request.messages
-    )
-    extraction_resp = oai.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[{"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}],
-        response_format={"type": "json_object"},
-    )
-
-    try:
-        profile_update = json.loads(extraction_resp.choices[0].message.content)
-    except Exception:
+    if oai is None:
+        # Offline mode (no OPENAI_API_KEY): no LLM reply or extraction, but the
+        # safety + emergency routing below are rule-based and still work.
+        reply = "CareKaki is running in offline mode — set OPENAI_API_KEY for live replies."
         profile_update = {}
+    else:
+        # Main chat response
+        chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
+        chat_resp = oai.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=chat_messages,
+        )
+        reply = chat_resp.choices[0].message.content
+
+        # Profile extraction
+        conversation_text = "\n".join(
+            f"{m.role}: {m.content}" for m in request.messages
+        )
+        extraction_resp = oai.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[{"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}],
+            response_format={"type": "json_object"},
+        )
+
+        try:
+            profile_update = json.loads(extraction_resp.choices[0].message.content)
+        except Exception:
+            profile_update = {}
 
     guardian = guardian_check(reply, adapter_name="chat", data_sources=["openai"])
     safe_reply = guardian["safe_text"]
@@ -251,6 +262,9 @@ def chat(request: ChatRequest):
 
 @app.post("/pathway")
 def pathway(request: PathwayRequest):
+    if oai is None:
+        return {"columns": []}
+
     prompt = f"{PATHWAY_PROMPT}\n\nCare profile:\n{json.dumps(request.profile)}"
 
     resp = oai.chat.completions.create(
@@ -326,6 +340,12 @@ async def telegram_webhook(request: Request):
         chat_id = update["message"]["chat"]["id"]
         text = update["message"]["text"]
         log_telegram("user", text)
+
+        if oai is None:
+            ack = "Thanks for your message — a coordinator will follow up."
+            send_telegram_message(chat_id, ack)
+            log_telegram("bot", ack)
+            return {"ok": True}
 
         classify_resp = oai.chat.completions.create(
             model=CHAT_MODEL,
@@ -695,6 +715,9 @@ class PathwayEditRequest(BaseModel):
 
 @app.post("/pathway/edit")
 def pathway_edit(req: PathwayEditRequest):
+    if oai is None:
+        return {"columns": req.current_columns}
+
     prompt = (
         f"{PATHWAY_PROMPT}\n\n"
         f"Care profile:\n{json.dumps(req.profile)}\n\n"

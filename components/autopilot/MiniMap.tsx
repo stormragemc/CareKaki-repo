@@ -136,7 +136,7 @@ export default function MiniMap({ center, markers, height = "180px" }: MiniMapPr
               <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="shrink-0 w-7 h-7 rounded-full bg-brand-teal/20 text-brand-teal text-xs font-bold flex items-center justify-center">
+                  <span className="shrink-0 w-7 h-7 rounded-full bg-caregiver/25 text-caregiver-soft text-xs font-bold flex items-center justify-center">
                     {selected.rank ?? "•"}
                   </span>
                   <span className="text-base font-semibold text-white">{selected.label}</span>

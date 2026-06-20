@@ -1,39 +1,113 @@
 @import "tailwindcss";
 
-/* ── Brand colour palette ── */
+/* Design tokens + animations (see docs/themes/implementation-spec.md §3).
+   Everything lives in @theme so it surfaces as Tailwind utilities:
+   colors generate bg-, text- and border- utilities; animations generate animate-.
+   Base body styling (bg-cream text-ink text-lg) is applied via Tailwind classes
+   in app/layout.tsx. */
 @theme {
-  --color-brand-orange: #E8622C;
-  --color-brand-orange-light: #FBE8DA;
-  --color-brand-teal: #2D5F4E;
-  --color-brand-teal-light: #D6EBE0;
-  --color-brand-brown: #2C1510;
-  --color-brand-cream: #F5EDE0;
-  --color-brand-cream-border: #E8DDD0;
-  --color-brand-amber: #C4952B;
-  --color-brand-amber-light: #F5E8C4;
-  --color-brand-blue: #2B5DA6;
-  --color-brand-blue-light: #D6E4F5;
-  --color-brand-pink: #A0445A;
-  --color-brand-pink-light: #F0D4DC;
+  /* neutrals / canvas */
+  --color-cream: #FBF7F1;
+  --color-cream-deep: #F4EEE4;
+  --color-surface: #FFFFFF;
+  --color-ink: #2C2722;
+  --color-ink-body: #3A352E;
+  --color-ink-soft: #6F685E;
+  --color-ink-muted: #8A8074;
+  --color-ink-faint: #9A9184;
+  --color-hairline: #EDE7DC;
+  --color-hairline-warm: #E4DCCE;
 
-  /* Font stacks */
+  /* mode — self (orange) */
+  --color-self: #D9742E;
+  --color-self-ink: #A85518;
+  --color-self-soft: #FBEEE2;
+  --color-self-border: #F0D9C4;
+
+  /* mode — caregiver (teal) */
+  --color-caregiver: #1C6B66;
+  --color-caregiver-ink: #15524E;
+  --color-caregiver-soft: #E3F0EE;
+  --color-caregiver-border: #C9E0DD;
+
+  /* autopilot dark world */
+  --color-autopilot-bg: #241C16;
+  --color-autopilot-card: #322820;
+  --color-autopilot-card-draft: #2A211B;
+  --color-autopilot-band: #1B1410;
+  --color-autopilot-hairline: #463A30;
+  --color-autopilot-text: #F3E9DC;
+  --color-autopilot-muted: #9A8C7C;
+
+  /* pathway groups */
+  --color-week: #C2841A;        --color-week-soft: #FBEEE2;
+  --color-weeks: #3B6FB0;       --color-weeks-soft: #EAF0F7;
+  --color-apply: #3E8E5A;       --color-apply-ink: #2E7D58;  --color-apply-soft: #E7F1EC;
+  --color-single: #7C5AA6;      --color-single-soft: #F0EAF6;
+
+  /* status — light / dark */
+  --color-status-done: #2E7D58;      --color-status-done-dark: #6FCF97;
+  --color-status-done-bg: #E7F1EC;   --color-status-done-bg-dark: #1F2E22;
+  --color-status-running: #C2841A;   --color-status-running-dark: #E0A94A;
+  --color-status-running-bg: #FBF0DC;--color-status-running-bg-dark: #3A2E1A;
+  --color-status-draft: #8A7B63;     --color-status-draft-dark: #C9BBA8;
+  --color-status-draft-bg: #EFE7D9;  --color-status-draft-bg-dark: #3A322A;
+
+  /* live / guardian / singpass */
+  --color-live: #2E7D58;       --color-live-dark: #7FE3A6;   --color-live-dot: #4ED98A;
+  --color-live-band-dark: #10301F;
+  --color-guardian-border: #BFD8C6; --color-guardian-border-dark: #4A6B52;
+  --color-singpass: #F4453C;
+
+  /* fonts */
   --font-serif: var(--font-playfair), Georgia, serif;
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
+
+  /* animations → animate-* utilities.
+     ck-pulse is mode-colored via the --ck-pulse var (set per element with a
+     Tailwind arbitrary property, e.g. [--ck-pulse:rgba(28,107,102,0.45)]). */
+  --animate-ck-pulse: ckPulse 1.8s ease-out 1;
+  --animate-ck-fade-in: ckFadeIn 0.5s ease-out 1;
+  --animate-slide-up: slideUp 0.3s ease-out 1;
+
+  @keyframes ckPulse {
+    0%   { box-shadow: 0 0 0 0 var(--ck-pulse, rgba(217, 116, 46, 0.45)); }
+    70%  { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  }
+
+  @keyframes ckFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* ── Accessibility base (spec §8) ─────────────────────────────────────────────
+   Visible keyboard focus on every interactive (self-orange reads on both the
+   cream and the dark autopilot worlds). Elements that opt out with `outline-none`
+   provide their own focus cue (e.g. focus:border-self on inputs). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-self);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
 
-body {
-  background-color: #F5EDE0;
-  color: #1a1a1a;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  /* The "just updated" pulse and crossfades are decorative — honour reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

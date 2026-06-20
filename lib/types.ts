@@ -51,3 +51,35 @@ export interface AutopilotService {
   statusLabel: string;
   isRunning: boolean;
 }
+
+// ── Living Care Profile (view model over CareProfile) ─────────────────────────
+// Marks which profile fields are MyInfo-verified vs. assembled from chat, and
+// drives the "just updated" pulse. Keyed by CareProfile field name.
+export type FieldSource = "myinfo" | "chat";
+
+export interface ProfileFieldMeta {
+  source: FieldSource;
+  justUpdated?: boolean;   // toggles the ckPulse ring; cleared ~1.8s after set
+}
+
+export type ProfileMeta = Partial<Record<keyof CareProfile, ProfileFieldMeta>>;
+
+// ── Pathway (design view model) ───────────────────────────────────────────────
+export type PathwayGroup = "this-week" | "weeks-2-8" | "apply-now" | "single-point";
+export type Divergence = "differs" | "elevated";   // persona-specific highlight tag
+
+export interface PathwayItem {
+  id: string;
+  group: PathwayGroup;
+  title: string;
+  whyTag: string;          // always traces back to a profile fact
+  divergence?: Divergence;
+  highlight?: boolean;     // emphasis card (e.g. ICCP single point of contact)
+}
+
+// ── Consent / Care Brief ──────────────────────────────────────────────────────
+export interface ConsentField {
+  label: string;
+  value?: string;          // masked where sensitive (e.g. NRIC)
+  subcopy?: string;
+}

@@ -1,0 +1,9 @@
+# Backend build context (./backend) — keep data/ (synthetic geojson/csv), drop the rest.
+__pycache__
+*.py[cod]
+.venv
+venv
+.env
+.env.*
+*.md
+.DS_Store

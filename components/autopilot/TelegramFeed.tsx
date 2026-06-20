@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChatBubble } from "./WorkspaceLog";
+import { useEffect, useRef, useState } from "react";
+import { ChatBubble, DraftNotice } from "./WorkspaceLog";
 
 interface TelegramLogEntry {
   from: "bot" | "user";
@@ -10,14 +10,14 @@ interface TelegramLogEntry {
   time: string;
 }
 
-export default function TelegramFeed() {
+export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) {
   const [log, setLog] = useState<TelegramLogEntry[]>([]);
-  const [triggered, setTriggered] = useState(false);
+  const triggeredRef = useRef(false);
 
-  // Auto-trigger emergency alert on mount
+  // Auto-trigger emergency alert on mount (once).
   useEffect(() => {
-    if (triggered) return;
-    setTriggered(true);
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
 
     const trigger = async () => {
       await new Promise((r) => setTimeout(r, 1500));
@@ -44,10 +44,11 @@ export default function TelegramFeed() {
     };
 
     trigger();
-  }, [triggered]);
+  }, []);
 
   // Poll the log
   useEffect(() => {
+    if (!enabled) return; // held behind the approval gate
     const fetchLog = () => {
       fetch("http://localhost:8000/telegram/log")
         .then((res) => res.json())
@@ -58,13 +59,15 @@ export default function TelegramFeed() {
     fetchLog();
     const interval = setInterval(fetchLog, 1500);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return <DraftNotice label="Drafted — caregiver alert awaiting approval" />;
 
   if (log.length === 0) {
     return (
       <div className="flex items-center gap-2 px-2 py-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-        <span className="text-xs text-white/60">Sending caregiver alert…</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-status-running-dark animate-pulse" aria-hidden="true" />
+        <span className="text-xs text-autopilot-muted">Sending caregiver alert…</span>
       </div>
     );
   }

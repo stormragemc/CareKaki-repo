@@ -1,38 +1,58 @@
 import Link from "next/link";
+import { User, Users, ArrowRight } from "lucide-react";
+import type { CareMode } from "@/lib/types";
 
 interface ModeCardProps {
-  mode: "self" | "caregiver";
+  mode: CareMode;
   title: string;
   description: string;
   href: string;
 }
 
+const config = {
+  self: {
+    Icon: User,
+    border: "border-self-border",
+    iconBg: "bg-self-soft",
+    iconColor: "text-self",
+    cta: "bg-self hover:bg-self-ink",
+    shadow: "shadow-[0_10px_28px_rgba(217,116,46,0.10)]",
+    ctaLabel: "Start for myself",
+  },
+  caregiver: {
+    Icon: Users,
+    border: "border-caregiver-border",
+    iconBg: "bg-caregiver-soft",
+    iconColor: "text-caregiver",
+    cta: "bg-caregiver hover:bg-caregiver-ink",
+    shadow: "shadow-[0_10px_28px_rgba(28,107,102,0.10)]",
+    ctaLabel: "Start for someone",
+  },
+} satisfies Record<CareMode, unknown>;
+
 export default function ModeCard({ mode, title, description, href }: ModeCardProps) {
-  const isSelf = mode === "self";
+  const c = config[mode];
+  const Icon = c.Icon;
 
   return (
     <div
-      className={[
-        "rounded-xl p-6 border-l-4 flex flex-col gap-6",
-        isSelf
-          ? "bg-brand-orange-light border-brand-orange"
-          : "bg-brand-teal-light border-brand-teal",
-      ].join(" ")}
+      className={`flex flex-col gap-5 rounded-[20px] border-2 bg-surface p-8 ${c.border} ${c.shadow}`}
     >
+      <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${c.iconBg}`}>
+        <Icon size={28} className={c.iconColor} aria-hidden="true" />
+      </div>
+
       <div className="flex flex-col gap-2">
-        <h2 className="font-serif font-bold text-xl text-gray-900">{title}</h2>
-        <p className="text-sm text-gray-700 leading-relaxed">{description}</p>
+        <h2 className="font-serif font-semibold text-2xl text-ink">{title}</h2>
+        <p className="text-base text-ink-soft leading-relaxed">{description}</p>
       </div>
 
       <Link
         href={href}
-        className={[
-          "self-start inline-flex items-center gap-1 px-5 py-2 rounded-full",
-          "font-semibold text-sm text-white transition-opacity hover:opacity-90 active:scale-95",
-          isSelf ? "bg-brand-orange" : "bg-brand-teal",
-        ].join(" ")}
+        className={`mt-auto inline-flex min-h-[56px] items-center justify-center gap-2 rounded-xl text-base font-semibold text-white transition-colors active:scale-[0.99] ${c.cta}`}
       >
-        Start →
+        {c.ctaLabel}
+        <ArrowRight size={18} aria-hidden="true" />
       </Link>
     </div>
   );

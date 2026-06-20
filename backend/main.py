@@ -295,6 +295,7 @@ async def telegram_webhook(request: Request):
 from services.aic_adapter import recommend_aic_services
 from services.nursing_adapter import recommend_nursing_providers
 from services.medication_adapter import build_medication_review_packet, format_packet_for_telegram
+from services.guardian import guardian_check
 
 
 class AICRecommendRequest(BaseModel):
@@ -513,3 +514,21 @@ def medication_review(req: MedicationReviewRequest):
         packet["telegram_sent"] = False
 
     return packet
+
+
+# ── Guardian — Responsible-AI safety layer ───────────────────────────────────
+
+
+class GuardianRequest(BaseModel):
+    text: str
+
+
+@app.post("/guardian/check")
+def guardian_check_endpoint(req: GuardianRequest):
+    """Cross-cutting safety check (user-flows.md §8, UC-8 / UC-10).
+
+    Blocks clinical/medical-advice questions (routes to a human instead) and PII
+    (NRIC/FIN, phone, email) which it tokenises before anything is logged.
+    Deterministic and separately callable so it can be demoed live in Q&A.
+    """
+    return guardian_check(req.text)

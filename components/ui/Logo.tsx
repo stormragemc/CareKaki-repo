@@ -1,15 +1,25 @@
+import type { CareMode } from "@/lib/types";
+
 interface LogoProps {
   size?: number;
+  mode?: CareMode;
 }
 
-export default function Logo({ size = 28 }: LogoProps) {
+// Rounded-square "C" monogram, tinted by the active mode (self = orange,
+// caregiver = teal). Defaults to self/orange for mode-less screens (Landing).
+const fill: Record<CareMode, string> = {
+  self: "bg-self",
+  caregiver: "bg-caregiver",
+};
+
+export default function Logo({ size = 30, mode = "self" }: LogoProps) {
   return (
     <div
-      className="flex items-center justify-center bg-brand-orange rounded-md font-bold text-white leading-none select-none"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.43) }}
+      className={`flex items-center justify-center rounded-lg font-serif font-bold text-white leading-none select-none ${fill[mode]}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }}
       aria-hidden="true"
     >
-      ck
+      C
     </div>
   );
 }

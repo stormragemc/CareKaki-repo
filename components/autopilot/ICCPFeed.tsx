@@ -43,13 +43,26 @@ export default function ICCPFeed() {
       await new Promise((r) => setTimeout(r, 2000));
 
       try {
+        let patientName = "Senior";
+        let age = 75;
+        let issue = "Care concern requiring coordinator attention";
+        try {
+          const profileStr = sessionStorage.getItem("careProfile");
+          if (profileStr) {
+            const p = JSON.parse(profileStr);
+            patientName = p.name || patientName;
+            age = p.age || age;
+            issue = p.recentEvent || sessionStorage.getItem("autopilotTrigger") || issue;
+          }
+        } catch {}
+
         await fetch("http://localhost:8000/integrations/iccp/handover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            patient_name: "Mdm Tan",
-            age: 78,
-            issue: "Fall risk + caregiver unavailable for 2 hours",
+            patient_name: patientName,
+            age,
+            issue,
             risk: "High",
             suggested_action: "Urgent family check-in + clinic follow-up",
           }),

@@ -38,13 +38,30 @@ type Phase =
   | { step: "checking_slots" }
   | { step: "done"; data: NursingResponse };
 
-const USER_LAT = 1.3521;
-const USER_LNG = 103.8198;
+function getUserLocation() {
+  if (typeof window === "undefined") return { lat: 1.3521, lng: 103.8198 };
+  try {
+    const stored = sessionStorage.getItem("userLocation");
+    if (stored) {
+      const loc = JSON.parse(stored);
+      return { lat: loc.lat, lng: loc.lng };
+    }
+  } catch {}
+  return { lat: 1.3521, lng: 103.8198 };
+}
+
+function getCareNeed() {
+  if (typeof window === "undefined") return "Elderly patient needs home nursing care";
+  return sessionStorage.getItem("autopilotTrigger") || "Elderly patient needs home nursing care";
+}
 
 export default function NursingFeed() {
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
 
   useEffect(() => {
+    const { lat, lng } = getUserLocation();
+    const care_need = getCareNeed();
+
     const run = async () => {
       setPhase({ step: "searching" });
       try {
@@ -52,9 +69,9 @@ export default function NursingFeed() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            care_need: "Elderly patient needs post-fall home nursing care",
-            latitude: USER_LAT,
-            longitude: USER_LNG,
+            care_need,
+            latitude: lat,
+            longitude: lng,
             limit: 3,
           }),
         });
@@ -89,7 +106,7 @@ export default function NursingFeed() {
       {phase.step === "done" && (
         <>
           <MiniMap
-            center={{ lat: USER_LAT, lng: USER_LNG }}
+            center={getUserLocation()}
             markers={phase.data.recommended_providers.map((prov, i) => ({
               lat: prov.latitude,
               lng: prov.longitude,

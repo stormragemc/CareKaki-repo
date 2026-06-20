@@ -240,4 +240,4 @@ depend on Guardian; UC-12 needs a coordinator view.
 ---
 
 *Anchored to `product-source-of-truth.md` and `slide-fixes.md`. If product intent changes, update
-those first, then mirror here.*
+those first, then mirror the change here.*

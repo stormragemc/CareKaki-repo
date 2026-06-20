@@ -38,16 +38,28 @@ export default function MedicationFeed() {
     const trigger = async () => {
       await new Promise((r) => setTimeout(r, 3000));
       try {
+        let seniorName = "Senior";
+        let age = 75;
+        let rawMessage = "Senior feels unwell after taking medication";
+        try {
+          const profileStr = sessionStorage.getItem("careProfile");
+          if (profileStr) {
+            const p = JSON.parse(profileStr);
+            seniorName = p.name || seniorName;
+            age = p.age || age;
+            rawMessage = `${seniorName} ${p.conditions || "needs medication review"}`;
+          }
+        } catch {}
+
         await fetch("http://localhost:8000/integrations/medication-review/request", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            senior_name: "Mdm Tan",
-            age: 78,
-            medications: ["amlodipine", "metformin"],
-            symptom: "dizziness after medication",
-            context: "fell earlier today and caregiver is worried",
-            raw_message: "Granny feels dizzy after taking amlodipine and metformin",
+            senior_name: seniorName,
+            age,
+            symptom: sessionStorage.getItem("autopilotTrigger") || "medication concern",
+            context: "caregiver is worried about medication side effects",
+            raw_message: rawMessage,
           }),
         });
       } catch {}

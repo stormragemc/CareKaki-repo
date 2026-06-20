@@ -29,14 +29,29 @@ type Phase =
   | { step: "searching" }
   | { step: "done"; data: AICResponse };
 
-const USER_LAT = 1.3521;
-const USER_LNG = 103.8198;
+function getUserLocation() {
+  if (typeof window === "undefined") return { lat: 1.3521, lng: 103.8198 };
+  try {
+    const stored = sessionStorage.getItem("userLocation");
+    if (stored) {
+      const loc = JSON.parse(stored);
+      return { lat: loc.lat, lng: loc.lng };
+    }
+  } catch {}
+  return { lat: 1.3521, lng: 103.8198 };
+}
+
+function getCareNeed() {
+  if (typeof window === "undefined") return "General care assessment";
+  return sessionStorage.getItem("autopilotTrigger") || "Elderly person needs care support and nearby services";
+}
 
 export default function AICFeed() {
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
 
   useEffect(() => {
-    const care_need = "Granny fell off the stairs and is weak now";
+    const care_need = getCareNeed();
+    const { lat, lng } = getUserLocation();
 
     const run = async () => {
       setPhase({ step: "classifying", care_need });
@@ -49,8 +64,8 @@ export default function AICFeed() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             care_need,
-            latitude: USER_LAT,
-            longitude: USER_LNG,
+            latitude: lat,
+            longitude: lng,
             limit: 5,
           }),
         });
@@ -92,7 +107,7 @@ export default function AICFeed() {
           </div>
 
           <MiniMap
-            center={{ lat: USER_LAT, lng: USER_LNG }}
+            center={getUserLocation()}
             markers={phase.data.recommended_services.map((svc, i) => ({
               lat: svc.latitude,
               lng: svc.longitude,

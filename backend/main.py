@@ -17,7 +17,7 @@ load_dotenv()
 # offline; only the LLM-backed replies degrade gracefully.
 _OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 oai = OpenAI(api_key=_OPENAI_API_KEY) if _OPENAI_API_KEY else None
-CHAT_MODEL = "gpt-4o-mini"
+CHAT_MODEL = "gpt-4.1-mini"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"

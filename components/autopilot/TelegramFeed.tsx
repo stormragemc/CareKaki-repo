@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChatBubble } from "./WorkspaceLog";
+import { ChatBubble, DraftNotice } from "./WorkspaceLog";
 
 interface TelegramLogEntry {
   from: "bot" | "user";
@@ -10,10 +10,11 @@ interface TelegramLogEntry {
   time: string;
 }
 
-export default function TelegramFeed() {
+export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) {
   const [log, setLog] = useState<TelegramLogEntry[]>([]);
 
   useEffect(() => {
+    if (!enabled) return; // held behind the approval gate
     const fetchLog = () => {
       fetch("http://localhost:8000/telegram/log")
         .then((res) => res.json())
@@ -24,10 +25,12 @@ export default function TelegramFeed() {
     fetchLog();
     const interval = setInterval(fetchLog, 1500);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return <DraftNotice label="Drafted — caregiver alert awaiting approval" />;
 
   if (log.length === 0) {
-    return <p className="text-xs text-white/40 px-2 py-1">Waiting for activity…</p>;
+    return <p className="text-xs text-autopilot-muted px-2 py-1">Waiting for activity…</p>;
   }
 
   return (

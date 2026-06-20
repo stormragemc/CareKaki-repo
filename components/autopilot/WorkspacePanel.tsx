@@ -8,6 +8,7 @@ interface WorkspacePanelProps {
   subtitle: string;
   status?: PillStatus;
   liveLabel?: string;
+  sources?: string[];
   isExpanded: boolean;
   isAnyExpanded: boolean;
   onToggleExpand: () => void;
@@ -19,6 +20,7 @@ export default function WorkspacePanel({
   subtitle,
   status,
   liveLabel,
+  sources,
   isExpanded,
   isAnyExpanded,
   onToggleExpand,
@@ -41,6 +43,11 @@ export default function WorkspacePanel({
           <span className="text-[11px] text-autopilot-muted truncate">{subtitle}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {sources && sources.length > 0 && (
+            <span className="hidden lg:block max-w-[120px] truncate text-[9px] text-autopilot-muted/60">
+              {sources.join(" · ")}
+            </span>
+          )}
           {liveLabel && <LiveChip label={liveLabel} theme="dark" />}
           {status && <StatusPill status={status} theme="dark" />}
           <button
@@ -53,7 +60,6 @@ export default function WorkspacePanel({
         </div>
       </div>
 
-      {/* Feed */}
       <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
         {children}
       </div>

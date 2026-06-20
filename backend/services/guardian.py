@@ -1,120 +1,124 @@
-"""Guardian — CareKaki's cross-cutting Responsible-AI layer.
+"""
+CareKaki Guardian — Responsible AI Layer
 
-A real, separately-callable safety service (user-flows.md §8, UC-8 / UC-10). It is
-deliberately rule-based and deterministic so it can be demoed live in Q&A: the same
-input always yields the same decision, and "no medical advice" is enforced in code,
-not in a prompt.
-
-Two principles:
-  1. No medical advice — clinical questions are intercepted, never answered, and the
-     caller is routed to a human (the coordinator path).
-  2. PDPA scrub — PII (NRIC/FIN, phone, email) is detected and tokenised before any
-     logging or downstream use; raw identifiers never leave the boundary.
-
-`guardian_check(text)` returns a stable verdict the API exposes at POST /guardian/check.
+Lightweight rule-based safety filter applied to all agent outputs.
+In production this would be a dedicated LLM classifier; the rule-based
+version covers the core cases for the hackathon demo.
 """
 
 import re
-from typing import Literal, TypedDict
+from datetime import datetime
 
-Decision = Literal["allow", "block"]
-Category = Literal["none", "medical_advice", "pii"]
+# ── 1. PDPA Redaction ────────────────────────────────────────────────────────
+# Singapore NRIC: S/T/F/G/M + 7 digits + letter
+NRIC_PATTERN = re.compile(r"\b[STFGM]\d{7}[A-Z]\b", re.IGNORECASE)
+# Singapore phone: 8 digits starting with 6/8/9, optional +65 prefix
+PHONE_PATTERN = re.compile(r"(?:\+65[\s-]?)?\b[689]\d{7}\b")
+# Email
+EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+
+def redact_pdpa(text: str) -> dict:
+    flags = []
+    redacted = text
+
+    nric_matches = NRIC_PATTERN.findall(text)
+    if nric_matches:
+        for m in nric_matches:
+            redacted = redacted.replace(m, m[0] + "****" + m[-1])
+        flags.append(f"PDPA: {len(nric_matches)} NRIC number(s) redacted")
+
+    phone_matches = PHONE_PATTERN.findall(text)
+    if phone_matches:
+        for m in phone_matches:
+            redacted = redacted.replace(m, m[:4] + "****")
+        flags.append(f"PDPA: {len(phone_matches)} phone number(s) redacted")
+
+    email_matches = EMAIL_PATTERN.findall(text)
+    if email_matches:
+        for m in email_matches:
+            redacted = redacted.replace(m, "****@****")
+        flags.append(f"PDPA: {len(email_matches)} email(s) redacted")
+
+    return {"text": redacted, "flags": flags, "redacted": len(flags) > 0}
 
 
-class GuardianVerdict(TypedDict):
-    decision: Decision
-    category: Category
-    reason: str
-    matched: list[str]
-    redacted: str
+# ── 2. No-Medical-Advice Classifier ─────────────────────────────────────────
 
-
-# ── PII detectors (Singapore-specific) ───────────────────────────────────────
-# NRIC / FIN: prefix S/T/F/G/M + 7 digits + checksum letter.
-_NRIC_RE = re.compile(r"\b[STFGM]\d{7}[A-Z]\b", re.IGNORECASE)
-# SG mobile/landline: 8 digits starting 6/8/9, optional +65 country code.
-_PHONE_RE = re.compile(r"(?<![\d.])(?:\+?65[\s-]?)?[689]\d{3}[\s-]?\d{4}(?![\d.])")
-_EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
-
-_PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
-    ("NRIC/FIN", _NRIC_RE, "[NRIC]"),
-    ("email", _EMAIL_RE, "[EMAIL]"),
-    ("phone", _PHONE_RE, "[PHONE]"),
+MEDICAL_ADVICE_PATTERNS = [
+    (re.compile(r"\btake\s+\d+\s*mg\b", re.IGNORECASE), "Specific dosage recommendation detected"),
+    (re.compile(r"\bprescribe[ds]?\b", re.IGNORECASE), "Prescription language detected"),
+    (re.compile(r"\bdiagnos(?:e[ds]?|is)\b", re.IGNORECASE), "Diagnostic language detected"),
+    (re.compile(r"\bstop\s+(?:taking|your)\s+\w+", re.IGNORECASE), "Medication cessation advice detected"),
+    (re.compile(r"\bincrease\s+(?:the\s+)?dos(?:e|age)\b", re.IGNORECASE), "Dosage change advice detected"),
+    (re.compile(r"\breduce\s+(?:the\s+)?dos(?:e|age)\b", re.IGNORECASE), "Dosage change advice detected"),
+    (re.compile(r"\byou\s+(?:have|are suffering from)\s+\w+", re.IGNORECASE), "Diagnostic language detected"),
 ]
 
-# ── Medical-advice detectors ─────────────────────────────────────────────────
-# Dosage instructions, e.g. "take 2 tablets", "500 mg twice daily".
-_DOSAGE_RE = re.compile(
-    r"\b\d+\s?(?:mg|mcg|ml|g|iu|units?|tablets?|pills?|capsules?|doses?|puffs?|drops?)\b",
-    re.IGNORECASE,
-)
-# Imperatives / questions that seek a clinical decision about medication or treatment.
-_MED_ADVICE_RE = re.compile(
-    r"\b(?:"
-    r"prescrib\w*|diagnos\w*|overdose|"
-    r"(?:increase|decrease|adjust|change|switch|stop|start|skip|double|halve)\s+"
-    r"(?:the\s+|her\s+|his\s+|their\s+|my\s+)?(?:dose|dosage|medication|meds|tablets?|pills?|insulin)|"
-    r"(?:should|can|do)\s+(?:i|we|she|he|they)\s+(?:take|give|stop|change|increase|decrease|adjust)|"
-    r"is\s+it\s+safe\s+to\s+take|"
-    r"what\s+(?:dose|dosage|medication|medicine)|"
-    r"how\s+(?:much|many)\s+\w+\s+should"
-    r")\b",
-    re.IGNORECASE,
-)
+MEDICAL_DISCLAIMER = "Note: CareKaki does not provide medical advice. Please consult a healthcare professional for clinical guidance."
 
-_ROUTE_TO_HUMAN = (
-    "CareKaki does not give medical advice. This looks like a clinical question — "
-    "I've flagged it for a human care coordinator who can help (one click away)."
-)
+def check_medical_advice(text: str) -> dict:
+    flags = []
+    for pattern, label in MEDICAL_ADVICE_PATTERNS:
+        if pattern.search(text):
+            flags.append(f"Medical safety: {label}")
+
+    needs_disclaimer = len(flags) > 0
+    return {
+        "flags": flags,
+        "needs_disclaimer": needs_disclaimer,
+        "disclaimer": MEDICAL_DISCLAIMER if needs_disclaimer else None,
+    }
 
 
-def _scan_pii(text: str) -> tuple[list[str], str]:
-    """Return (matched PII types, redacted text)."""
-    matched: list[str] = []
-    redacted = text
-    for label, pattern, token in _PII_PATTERNS:
-        if pattern.search(redacted):
-            matched.append(label)
-            redacted = pattern.sub(token, redacted)
-    return matched, redacted
+# ── 3. Human-Gate Flag ──────────────────────────────────────────────────────
+
+RISKY_ACTIONS = [
+    "submit", "book", "apply", "send referral", "escalat",
+    "call ambulance", "call 995", "notify next-of-kin",
+    "handover", "transfer case",
+]
+
+def check_human_gate(text: str) -> dict:
+    lower = text.lower()
+    triggered = [action for action in RISKY_ACTIONS if action in lower]
+    return {
+        "requires_confirmation": len(triggered) > 0,
+        "risky_actions": triggered,
+        "gate_message": "This action requires caregiver/supervisor approval before proceeding." if triggered else None,
+    }
 
 
-def guardian_check(text: str) -> GuardianVerdict:
-    """Classify a message and decide whether CareKaki may act on it as-is.
+# ── 4. Traceability ─────────────────────────────────────────────────────────
 
-    PII is checked first (it must be tokenised regardless of intent); then the
-    no-medical-advice rule. An empty/clean message is allowed unchanged.
-    """
-    text = (text or "").strip()
+def add_traceability(adapter_name: str, data_sources: list[str]) -> dict:
+    return {
+        "adapter": adapter_name,
+        "sources": data_sources,
+        "timestamp": datetime.now().isoformat(),
+        "traceable": True,
+    }
 
-    pii_matched, redacted = _scan_pii(text)
-    if pii_matched:
-        joined = ", ".join(pii_matched)
-        return GuardianVerdict(
-            decision="block",
-            category="pii",
-            reason=(
-                f"Personal data detected ({joined}). Guardian tokenised it before "
-                f"logging — raw identifiers never leave the regional boundary."
-            ),
-            matched=pii_matched,
-            redacted=redacted,
-        )
 
-    med_hits = _MED_ADVICE_RE.findall(text) or _DOSAGE_RE.findall(text)
-    if med_hits:
-        return GuardianVerdict(
-            decision="block",
-            category="medical_advice",
-            reason=_ROUTE_TO_HUMAN,
-            matched=[m if isinstance(m, str) else " ".join(m) for m in med_hits],
-            redacted=redacted,
-        )
+# ── 5. Full Guardian Pass ────────────────────────────────────────────────────
 
-    return GuardianVerdict(
-        decision="allow",
-        category="none",
-        reason="No medical advice or personal data detected.",
-        matched=[],
-        redacted=redacted,
-    )
+def guardian_check(text: str, adapter_name: str = "", data_sources: list[str] | None = None) -> dict:
+    pdpa = redact_pdpa(text)
+    medical = check_medical_advice(pdpa["text"])
+    gate = check_human_gate(pdpa["text"])
+    trace = add_traceability(adapter_name, data_sources or [])
+
+    all_flags = pdpa["flags"] + medical["flags"]
+    if gate["requires_confirmation"]:
+        all_flags.append(f"Human gate: action requires approval ({', '.join(gate['risky_actions'])})")
+
+    return {
+        "safe_text": pdpa["text"],
+        "original_redacted": pdpa["redacted"],
+        "medical_disclaimer": medical["disclaimer"],
+        "requires_confirmation": gate["requires_confirmation"],
+        "risky_actions": gate["risky_actions"],
+        "traceability": trace,
+        "flags": all_flags,
+        "flag_count": len(all_flags),
+        "passed": len(all_flags) == 0,
+    }

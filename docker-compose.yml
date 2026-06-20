@@ -14,7 +14,7 @@ services:
       - "8000:8000"
     # Optional keys (LLM/Telegram). Defaults keep the container booting with synthetic data.
     environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       ICCP_BOT_TELEGRAM_TOKEN: ${ICCP_BOT_TELEGRAM_TOKEN:-}
       OPENFDA_API_TOKEN: ${OPENFDA_API_TOKEN:-}

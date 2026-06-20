@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatBubble, DraftNotice } from "./WorkspaceLog";
 
 interface TelegramLogEntry {
@@ -12,7 +12,41 @@ interface TelegramLogEntry {
 
 export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) {
   const [log, setLog] = useState<TelegramLogEntry[]>([]);
+  const triggeredRef = useRef(false);
 
+  // Auto-trigger emergency alert on mount (once).
+  useEffect(() => {
+    if (triggeredRef.current) return;
+    triggeredRef.current = true;
+
+    const trigger = async () => {
+      await new Promise((r) => setTimeout(r, 1500));
+
+      let seniorName = "Senior";
+      let message = "Emergency alert: your family member needs help. Please respond.";
+      try {
+        const profileStr = sessionStorage.getItem("careProfile");
+        if (profileStr) {
+          const p = JSON.parse(profileStr);
+          seniorName = p.name || seniorName;
+          const event = p.recentEvent || "needs immediate attention";
+          message = `Emergency alert: ${seniorName} — ${event}. Please respond as soon as possible.`;
+        }
+      } catch {}
+
+      try {
+        await fetch("http://localhost:8000/carekaki/emergency-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+      } catch {}
+    };
+
+    trigger();
+  }, []);
+
+  // Poll the log
   useEffect(() => {
     if (!enabled) return; // held behind the approval gate
     const fetchLog = () => {
@@ -30,7 +64,12 @@ export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) 
   if (!enabled) return <DraftNotice label="Drafted — caregiver alert awaiting approval" />;
 
   if (log.length === 0) {
-    return <p className="text-xs text-autopilot-muted px-2 py-1">Waiting for activity…</p>;
+    return (
+      <div className="flex items-center gap-2 px-2 py-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-status-running-dark animate-pulse" aria-hidden="true" />
+        <span className="text-xs text-autopilot-muted">Sending caregiver alert…</span>
+      </div>
+    );
   }
 
   return (

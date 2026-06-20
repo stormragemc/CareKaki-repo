@@ -1,11 +1,11 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 import AgentWorkspace from "@/components/autopilot/AgentWorkspace";
+import PipelineBar from "@/components/autopilot/PipelineBar";
 
 export default function AutopilotPage() {
   return (
     <div className="min-h-screen bg-brand-brown text-white flex flex-col">
-      {/* Minimal dark header */}
       <header className="sticky top-0 z-50 bg-brand-brown/95 backdrop-blur-sm border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -30,10 +30,8 @@ export default function AutopilotPage() {
         </div>
       </header>
 
-      {/* Live agent workspace */}
-      {/* INTEGRATION POINT: Each panel should poll/subscribe to its own
-          backend feed (ICCP handover, HomeNursing booking, AIC application,
-          Telegram webhook log) and stream entries in as they happen. */}
+      <PipelineBar />
+
       <main className="flex-1 w-full px-4 py-4 overflow-hidden">
         <AgentWorkspace />
       </main>

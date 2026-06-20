@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+CHAT_MODEL = "gpt-4o-mini"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -98,7 +99,53 @@ member. Classify their message and return only a JSON object with these fields:
 
 Caregiver message: """
 
-CHAT_MODEL = "gpt-4o-mini"
+EMERGENCY_KEYWORDS = [
+    "fall", "fell", "collapsed", "collapse", "unconscious", "unresponsive",
+    "chest pain", "heart attack", "stroke", "seizure", "choking",
+    "bleeding", "can't breathe", "cannot breathe", "shortness of breath",
+    "emergency", "ambulance", "999", "995", "help now", "urgent",
+    "hit head", "head injury", "broken", "fracture",
+    "not moving", "not breathing", "fainted", "passed out",
+]
+
+
+def detect_emergency(text: str) -> bool:
+    lower = text.lower()
+    return any(kw in lower for kw in EMERGENCY_KEYWORDS)
+
+
+ADAPTER_RULES: list[tuple[list[str], list[str]]] = [
+    (["fall", "fell", "collapsed", "collapse", "fracture", "broken", "hit head", "head injury",
+      "not moving", "fainted", "passed out", "unconscious", "unresponsive"],
+     ["iccp", "aic", "telegram"]),
+    (["dizzy", "dizziness", "medication", "medicine", "drug", "pill", "tablet",
+      "side effect", "nausea", "vomit", "allergic", "reaction"],
+     ["medication", "telegram"]),
+    (["chest pain", "heart attack", "stroke", "seizure", "choking",
+      "bleeding", "can't breathe", "cannot breathe", "shortness of breath",
+      "not breathing", "ambulance", "999", "995"],
+     ["iccp", "telegram"]),
+    (["nursing", "home care", "wound", "dressing", "catheter", "injection",
+      "physiotherapy", "rehab", "discharge", "post-surgery"],
+     ["nursing", "iccp"]),
+    (["grant", "subsidy", "financial", "caregiver grant", "means test",
+      "assistance", "support scheme"],
+     ["aic"]),
+    (["lonely", "alone", "isolated", "social", "depressed", "activity centre",
+      "day care", "respite"],
+     ["aic", "nursing"]),
+]
+
+
+def plan_adapters(text: str) -> list[str]:
+    lower = text.lower()
+    active: list[str] = []
+    for triggers, adapters in ADAPTER_RULES:
+        if any(t in lower for t in triggers):
+            active.extend(adapters)
+    if not active:
+        active = ["iccp", "nursing", "aic", "telegram"]
+    return list(dict.fromkeys(active))
 
 
 class Message(BaseModel):
@@ -114,11 +161,14 @@ class PathwayRequest(BaseModel):
     profile: dict
 
 
-def to_openai_history(messages: list[Message]):
-    return [
-        {"role": msg.role if msg.role == "user" else "assistant", "content": msg.content}
-        for msg in messages
-    ]
+def to_openai_messages(messages: list[Message], system_prompt: str = ""):
+    msgs = []
+    if system_prompt:
+        msgs.append({"role": "system", "content": system_prompt})
+    for msg in messages:
+        role = "user" if msg.role == "user" else "assistant"
+        msgs.append({"role": role, "content": msg.content})
+    return msgs
 
 
 def send_telegram_message(chat_id: int, text: str, buttons: list[list[str]] | None = None):
@@ -157,48 +207,66 @@ def get_telegram_log():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    history = to_openai_history(request.messages)
+    last_message = request.messages[-1].content
 
     # Main chat response
-    response = openai_client.chat.completions.create(
+    chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
+    chat_resp = oai.chat.completions.create(
         model=CHAT_MODEL,
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + history,
+        messages=chat_messages,
     )
-    reply = response.choices[0].message.content
+    reply = chat_resp.choices[0].message.content
 
     # Profile extraction
     conversation_text = "\n".join(
         f"{m.role}: {m.content}" for m in request.messages
     )
-    extraction = openai_client.chat.completions.create(
+    extraction_resp = oai.chat.completions.create(
         model=CHAT_MODEL,
-        messages=[
-            {"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}
-        ],
+        messages=[{"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}],
         response_format={"type": "json_object"},
     )
 
     try:
-        profile_update = json.loads(extraction.choices[0].message.content)
+        profile_update = json.loads(extraction_resp.choices[0].message.content)
     except Exception:
         profile_update = {}
 
-    return {"content": reply, "profileUpdate": profile_update}
+    guardian = guardian_check(reply, adapter_name="chat", data_sources=["openai"])
+    safe_reply = guardian["safe_text"]
+    if guardian["medical_disclaimer"]:
+        safe_reply += f"\n\n{guardian['medical_disclaimer']}"
+
+    is_emergency = detect_emergency(last_message)
+    adapters = plan_adapters(last_message) if is_emergency else []
+
+    return {
+        "content": safe_reply,
+        "profileUpdate": profile_update,
+        "emergency": is_emergency,
+        "adapters": adapters,
+        "guardian": {"flags": guardian["flags"]},
+    }
 
 
 @app.post("/pathway")
 def pathway(request: PathwayRequest):
     prompt = f"{PATHWAY_PROMPT}\n\nCare profile:\n{json.dumps(request.profile)}"
 
-    response = openai_client.chat.completions.create(
+    resp = oai.chat.completions.create(
         model=CHAT_MODEL,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
 
     try:
-        result = json.loads(response.choices[0].message.content)
-        columns = result if isinstance(result, list) else result.get("columns", [])
+        raw = json.loads(resp.choices[0].message.content)
+        if isinstance(raw, list):
+            columns = raw
+        elif isinstance(raw, dict):
+            columns = next((v for v in raw.values() if isinstance(v, list)), [])
+        else:
+            columns = []
     except Exception:
         columns = []
 
@@ -253,20 +321,20 @@ async def telegram_webhook(request: Request):
         log_telegram("bot", reply_text)
         return {"ok": True}
 
-    # Free-text reply — send to Gemini for classification
+    # Free-text reply — send to OpenAI for classification
     if "message" in update and "text" in update["message"]:
         chat_id = update["message"]["chat"]["id"]
         text = update["message"]["text"]
         log_telegram("user", text)
 
-        classification = openai_client.chat.completions.create(
+        classify_resp = oai.chat.completions.create(
             model=CHAT_MODEL,
             messages=[{"role": "user", "content": f"{CLASSIFY_PROMPT}{text}"}],
             response_format={"type": "json_object"},
         )
 
         try:
-            result = json.loads(classification.choices[0].message.content)
+            result = json.loads(classify_resp.choices[0].message.content)
         except Exception:
             result = {}
 
@@ -292,6 +360,7 @@ async def telegram_webhook(request: Request):
 from services.aic_adapter import recommend_aic_services
 from services.nursing_adapter import recommend_nursing_providers
 from services.medication_adapter import build_medication_review_packet, format_packet_for_telegram
+from services.guardian import guardian_check
 
 
 class AICRecommendRequest(BaseModel):
@@ -510,3 +579,142 @@ def medication_review(req: MedicationReviewRequest):
         packet["telegram_sent"] = False
 
     return packet
+
+
+# ── Guardian demo endpoint ───────────────────────────────────────────────────
+
+
+class GuardianCheckRequest(BaseModel):
+    text: str
+    adapter_name: str = ""
+    data_sources: list[str] = []
+
+
+@app.post("/guardian/check")
+def guardian_demo(req: GuardianCheckRequest):
+    return guardian_check(req.text, req.adapter_name, req.data_sources)
+
+
+# ── Autopilot plan endpoints ────────────────────────────────────────────────
+
+ADAPTER_META: dict[str, dict] = {
+    "iccp": {"title": "ICCP Coordinator", "description": "Assemble case packet and hand over to a care coordinator", "icon": "coordinator"},
+    "nursing": {"title": "HomeNursing.sg", "description": "Search nearby providers, check availability, and create a tentative booking", "icon": "nursing"},
+    "aic": {"title": "AIC Eldercare", "description": "Search eldercare services and recommend nearest support centres", "icon": "eldercare"},
+    "medication": {"title": "Medication Review", "description": "Look up HSA + openFDA data, flag risks, and route to pharmacy desk", "icon": "medication"},
+    "telegram": {"title": "Caregiver Alert", "description": "Send emergency alert to caregiver via Telegram with response options", "icon": "telegram"},
+}
+
+
+class PlanAdaptersRequest(BaseModel):
+    text: str
+
+
+@app.post("/autopilot/plan")
+def autopilot_plan(req: PlanAdaptersRequest):
+    return {"adapters": plan_adapters(req.text)}
+
+
+class GeneratePlanRequest(BaseModel):
+    care_need: str
+    profile: dict | None = None
+
+
+@app.post("/autopilot/generate-plan")
+def generate_autopilot_plan(req: GeneratePlanRequest):
+    adapters = plan_adapters(req.care_need)
+    steps = []
+    for i, adapter_id in enumerate(adapters):
+        meta = ADAPTER_META.get(adapter_id, {})
+        steps.append({
+            "id": adapter_id,
+            "order": i + 1,
+            "title": meta.get("title", adapter_id),
+            "description": meta.get("description", ""),
+            "icon": meta.get("icon", "default"),
+            "execution": "simultaneous",
+        })
+    return {"care_need": req.care_need, "steps": steps, "execution_mode": "simultaneous", "total_steps": len(steps)}
+
+
+class EditPlanRequest(BaseModel):
+    care_need: str
+    current_steps: list[dict]
+    feedback: str
+
+
+@app.post("/autopilot/edit-plan")
+def edit_autopilot_plan(req: EditPlanRequest):
+    current_ids = [s["id"] for s in req.current_steps]
+    feedback_lower = req.feedback.lower()
+
+    remove_map = {
+        "iccp": ["coordinator", "iccp", "handover", "case"],
+        "nursing": ["nursing", "provider", "booking", "clinic", "home care"],
+        "aic": ["aic", "eldercare", "grant", "activity centre", "senior"],
+        "medication": ["medication", "medicine", "pharmacy", "drug", "pill"],
+        "telegram": ["telegram", "alert", "notification", "caregiver alert"],
+    }
+
+    removal_phrases = ["don't", "dont", "remove", "skip", "no need", "i'll do", "ill do", "i will do", "not needed", "take out", "exclude", "drop"]
+    wants_removal = any(p in feedback_lower for p in removal_phrases)
+
+    new_ids = list(current_ids)
+    if wants_removal:
+        for adapter_id, keywords in remove_map.items():
+            if adapter_id in new_ids and any(kw in feedback_lower for kw in keywords):
+                new_ids.remove(adapter_id)
+
+    add_phrases = ["add", "include", "also run", "also do", "need"]
+    wants_add = any(p in feedback_lower for p in add_phrases)
+    if wants_add:
+        for adapter_id, keywords in remove_map.items():
+            if adapter_id not in new_ids and any(kw in feedback_lower for kw in keywords):
+                new_ids.append(adapter_id)
+
+    steps = []
+    for i, adapter_id in enumerate(new_ids):
+        meta = ADAPTER_META.get(adapter_id, {})
+        steps.append({
+            "id": adapter_id,
+            "order": i + 1,
+            "title": meta.get("title", adapter_id),
+            "description": meta.get("description", ""),
+            "icon": meta.get("icon", "default"),
+            "execution": "simultaneous",
+        })
+
+    return {"care_need": req.care_need, "steps": steps, "execution_mode": "simultaneous", "total_steps": len(steps), "edited": True}
+
+
+class PathwayEditRequest(BaseModel):
+    profile: dict
+    current_columns: list[dict]
+    feedback: str
+
+
+@app.post("/pathway/edit")
+def pathway_edit(req: PathwayEditRequest):
+    prompt = (
+        f"{PATHWAY_PROMPT}\n\n"
+        f"Care profile:\n{json.dumps(req.profile)}\n\n"
+        f"Current care plan:\n{json.dumps(req.current_columns)}\n\n"
+        f"The caregiver wants the following change:\n{req.feedback}\n\n"
+        f"Regenerate the full care plan with this change applied. Return the updated JSON array."
+    )
+    resp = oai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    try:
+        raw = json.loads(resp.choices[0].message.content)
+        if isinstance(raw, list):
+            columns = raw
+        elif isinstance(raw, dict):
+            columns = next((v for v in raw.values() if isinstance(v, list)), [])
+        else:
+            columns = []
+    except Exception:
+        columns = req.current_columns
+    return {"columns": columns}

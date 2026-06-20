@@ -25,6 +25,11 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 ICCP_BOT_TOKEN = os.getenv("ICCP_BOT_TELEGRAM_TOKEN")
 ICCP_API = f"https://api.telegram.org/bot{ICCP_BOT_TOKEN}"
 
+# Public HTTPS base (e.g. the ngrok tunnel) Telegram should call back on. When set,
+# the backend points both bots' webhooks here on startup so no manual setWebhook /
+# "telegram connect link" step is needed. Leave blank for the keyless demo.
+PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
+
 # Hackathon-simple in-memory state (resets when server restarts)
 caregiver_chat_id: int | None = None
 telegram_log: list[dict] = []
@@ -70,6 +75,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _register_webhook(api_base: str, token: str | None, path: str) -> None:
+    """Point a bot's webhook at PUBLIC_BASE_URL + path. Best-effort: a network
+    blip or a sleeping tunnel shouldn't stop the server from booting."""
+    if not token:
+        return
+    url = f"{PUBLIC_BASE_URL}{path}"
+    try:
+        resp = requests.post(f"{api_base}/setWebhook", data={"url": url}, timeout=10)
+        ok = resp.ok and resp.json().get("ok")
+        print(f"[webhook] setWebhook {url} -> {'ok' if ok else resp.text}")
+    except Exception as exc:  # noqa: BLE001 — never block startup on Telegram
+        print(f"[webhook] setWebhook {url} failed: {exc}")
+
+
+@app.on_event("startup")
+def register_telegram_webhooks() -> None:
+    if not PUBLIC_BASE_URL or PUBLIC_BASE_URL in ("https://", "http://"):
+        print("[webhook] PUBLIC_BASE_URL not set — skipping webhook registration")
+        return
+    _register_webhook(TELEGRAM_API, TELEGRAM_BOT_TOKEN, "/telegram/webhook")
+    _register_webhook(ICCP_API, ICCP_BOT_TOKEN, "/iccp/webhook")
 
 SYSTEM_PROMPT = """You are CareKaki, a care navigator helping families in Singapore
 navigate community care services. You ask short, empathetic questions to understand

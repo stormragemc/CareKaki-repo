@@ -18,6 +18,9 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       ICCP_BOT_TELEGRAM_TOKEN: ${ICCP_BOT_TELEGRAM_TOKEN:-}
       OPENFDA_API_TOKEN: ${OPENFDA_API_TOKEN:-}
+      # When set, the backend registers its Telegram webhooks against this public URL
+      # on startup (e.g. the ngrok tunnel below). Leave blank for the keyless demo.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     healthcheck:
       test:
         - CMD
@@ -51,6 +54,27 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Public tunnel for Telegram webhooks. Only started with the "webhook" profile:
+  #   docker compose --profile webhook up
+  # Requires NGROK_AUTHTOKEN + a (reserved) NGROK_DOMAIN. The backend reads
+  # PUBLIC_BASE_URL=https://${NGROK_DOMAIN} and registers both bot webhooks on boot.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: carekaki-ngrok
+    profiles: ["webhook"]
+    command:
+      - "http"
+      - "backend:8000"
+      - "--domain=${NGROK_DOMAIN}"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040" # local ngrok inspector (http://localhost:4040)
     depends_on:
       backend:
         condition: service_healthy

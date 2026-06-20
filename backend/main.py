@@ -229,8 +229,9 @@ def chat(request: ChatRequest):
         reply = chat_resp.choices[0].message.content
 
         # Profile extraction
+        role_label = {"user": "Patient", "assistant": "CareKaki"}
         conversation_text = "\n".join(
-            f"{m.role}: {m.content}" for m in request.messages
+            f"{role_label.get(m.role, m.role)}: {m.content}" for m in request.messages
         )
         extraction_resp = oai.chat.completions.create(
             model=CHAT_MODEL,

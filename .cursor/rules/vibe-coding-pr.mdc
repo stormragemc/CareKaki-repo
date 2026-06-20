@@ -1,0 +1,84 @@
+---
+description: How to write PR descriptions that document the vibe coding thought process
+---
+
+# Vibe Coding PR Descriptions
+
+When creating a PR, **document the thought process and discussion flow**, not just what changed. Code is cheap -- anyone can produce code. What matters is showing HOW decisions were made so others can understand the reasoning.
+
+This applies to:
+- PR descriptions (`gh pr create --body ...`)
+- Summaries posted as PR comments (`gh pr comment ...`) when review feedback is addressed
+
+## Structure
+
+Write the PR as a narrative of the implementation journey:
+
+1. **The Problem Discovery** -- What triggered this work? What broke or what was the user's request?
+2. **Each Attempt / Iteration** -- Walk through each approach tried, including ones that were abandoned. For each:
+   - What was the idea
+   - What problem was discovered during discussion or testing
+   - Why it was changed or simplified
+3. **Key Discussion Insights** -- Quote the pivotal "aha" moments that changed the design direction. Use the format: `**Discussion insight:** "quote from the conversation"`
+4. **QA / Testing Findings** -- If QA testing revealed issues, document each finding and the iterative fix
+5. **Final Design** -- The approach that shipped, explained in context of why alternatives were rejected
+
+## What NOT to do
+
+- Do NOT just list files changed and bullet points of what was added
+- Do NOT write generic descriptions like "Added error handling for large snapshots"
+- Do NOT skip failed attempts -- they are the most valuable part for reviewers
+
+## Example pattern
+
+```markdown
+### Attempt 1: Cap at the tool execution layer
+
+First instinct: cap the data right after the tool returns.
+**Problem:** This only catches new results, not data loaded from history.
+
+### Simplification: Single cap point
+
+**Discussion insight:** "There's at most one AX tree in messages at any time,
+so why do we need two cap points?"
+Removed the redundant cap. One gate before the API call covers everything.
+
+### QA Found: Firestore 1MB limit
+
+During testing, hit a different crash...
+**First fix:** Surgically trim one field.
+**Discussion insight:** "Just do indiscriminate capping -- if the agent does
+console.log(JSON.stringify(snapshot)) the logs field would be huge instead."
+**Final approach:** Hard-cap the serialized JSON. 3 lines, covers everything.
+```
+
+## When to use this style
+
+- Feature PRs developed through discussion (vibe coding sessions)
+- Bug fix PRs where the root cause wasn't obvious and required investigation
+- Any PR where the "why" is more interesting than the "what"
+
+For trivial PRs (typo fixes, version bumps), a standard description is fine.
+
+## Discussion material
+
+If the user pastes a Slack/chat conversation for you to summarize into a design doc, extract:
+- The inflection points where a decision was made or reversed
+- Quotes that capture "why" more than "what"
+- Options that were considered but rejected, with the reason
+
+Don't summarize the conversation blandly — surface the decision moments.
+
+## Tooling Requirement
+
+PR creation requires the [GitHub CLI (`gh`)](https://cli.github.com/) to be installed and authenticated. Without it, the agent cannot create PRs automatically.
+
+```bash
+# Verify gh is installed and authenticated
+gh auth status
+
+# Create PR (the agent uses this under the hood)
+gh pr create --base main --head <branch> --title "..." --body "..."
+```
+
+If `gh` is not available, the agent should push the branch and provide the PR creation URL for the user to create manually.

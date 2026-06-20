@@ -14,31 +14,72 @@
 
 ---
 
-## 1. Locked decisions (agreed before build)
+## 0. Build progress (resume here)
 
-- **Flow order:** Landing → **Consent** → Conversation → Pathway → Autopilot → Care Brief. Consent is a gate *before* the conversation. Landing routes to `/consent?mode=…`, not straight to `/chat`.
-- **Autopilot is dark-only.** Drop the design's Dark/Light segmented toggle (it existed to show both gallery frames). Ship the dark "machine world" as the canonical look; no theme context, no persistence. All other screens are light.
-- **Icons:** add `lucide-react`. Replace the prototype's CSS-shape/glyph placeholders with minimal, monochrome Lucide icons (person/people on Landing, status/▲ glyphs, etc.).
-- **Palette is a full token replacement**, not additive. The new hex set (section 3) replaces the current `brand-*` tokens in `app/globals.css`; existing screens (Landing/Chat/Pathway/Autopilot) get recolored to match the comps.
-- **Autopilot starts all-drafts.** The rich mixed-state gallery frame is just for visual density. Real initial state = every service `draft`; Approve (per-card or "Approve all") advances `draft → running → done`. Only the ICCP coordination card may bypass confirm (escalate-to-human faster).
+> Scratchpad for picking up across chats/windows. Update as phases land.
+
+**Decision (20 Jun):** scope = UI/visual reskin + new screens + draft/approve gate, **plus two cheap
+architecture signals** (a real Guardian stub invocable live in Q&A, and Dockerize). **Skip Kubernetes.**
+Final is **~10 min live + ~10 min Q&A** (`user-flows.md` §8) on 23 Jun.
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0 — Foundation | ✅ done | `lucide-react` installed; `globals.css` tokens + `animate-*` (Tailwind v4 `@theme`); `body` styling on Tailwind classes in `layout.tsx`; `lib/types.ts` extended; `components/ui/` kit (10 components) built; `tsc` clean. |
+| 1 — Persona data | ⏳ next | **Shared dependency — do alone, first.** Extend `DemoUser` (`profileMeta`, `consent`, `careBrief`, divergence). |
+| 2 — Entry screens | pending | Landing, Login, Onboard, Header/Logo + reroute to `/consent`. |
+| 3 — Consent (new) | pending | parallelizable after Phase 1 |
+| 4 — Conversation | pending | parallelizable after Phase 1 |
+| 5 — Pathway | pending | parallelizable after Phase 1 |
+| 6 — Autopilot + gate | pending | parallelizable after Phase 1 |
+| 7 — Care Brief (new) | pending | parallelizable after Phase 1 |
+| 8 — Responsive/a11y/cleanup | pending | last |
+| Guardian stub | pending | separate chat ok |
+| Dockerize | pending | separate chat ok |
+
+**Parallelizing across chats:** finish Phase 1 first (everything reads persona data). Then per-screen
+phases touch mostly different files and can run in parallel — but give each chat its **own git branch/
+worktree** to avoid stomping. Shared touchpoints to coordinate: `lib/demo-users.ts`,
+`components/layout/Header.tsx`, `app/(main)/layout.tsx`, `components/ui/*`. The design `README.md`
+(tokens, exact copy, per-persona field/divergence lists) is the visual source of truth — don't re-author copy.
+
+---
+
+## 1. Locked decisions
+
+Decisions from the initial design review, **reconciled against the actual `kith` codebase** after the
+teammate merge (see §9 for the reconciliation rationale and the codebase delta).
+
+- **Flow order:** Landing → (`/onboard` *or* `/login`) → **Consent** → Conversation → Pathway → Autopilot → Care Brief. **Keep** the existing `/login` (persona picker) and `/onboard` (form) entries and reskin them; **insert** the new Consent screen as the gate *after* onboard/login and *before* `/chat`.
+- **Autopilot — reskin, don't replace.** The teammate shipped a live `AgentWorkspace` (5 backend-polling feed panels + Leaflet maps) — keep it and the real integrations. Apply the design's visual language on top: new tokens, the **Guardian band**, honesty/`LIVE` cues, and a **draft/approve gate** before the feeds auto-run. Do **not** swap in the design's static `ServiceCard` model. Dark-only (drop the design's dark/light toggle).
+- **Personas — keep the 4 demo users** in `lib/demo-users.ts` (Mdm Tan, Mr Lim, Mrs Wong, Uncle Raj). Map the design's two: caregiver ≈ Mdm Tan, self ≈ Mr Lim; the other two inherit the same visual treatment. The **real fork is the selected demo user** (and its `adapters`), not `?mode=` (which stays a cosmetic label for now).
+- **Care Brief:** build the new `/handover` screen per the design (warm-handover finale).
+- **Icons:** add `lucide-react`. Replace the prototype's CSS-shape/glyph placeholders with minimal, monochrome Lucide icons.
+- **Palette is a full token replacement**, not additive. The new hex set (§3) replaces the current `brand-*` tokens in `app/globals.css`; existing screens get recolored to match the comps.
 - **`ckPulse` runs ~2s then settles.** The prototype's `infinite` is for the static file; in-app the "just updated" ring plays once (~1.8s) and `justUpdated` is then cleared.
-- **Mock / persona data first.** No backend wiring this pass (no SSE, no Singpass sandbox, no live WhatsApp/Calendar). UI is driven by per-persona mock datasets; the simulated status progression is faked client-side. Live integrations are a later layer (see `user-flows.md` §7).
-- **Honesty cues:** `LIVE` chips ONLY on WhatsApp send + Google Calendar invite. 5 services + Guardian wrapper (never 6). SACH is "physio/rehab," never "polyclinic."
+- **Visual pass, keep working backend.** Chat, pathway, and the autopilot feeds already call `localhost:8000` — do **not** rip those out. This pass is UI/visual + the new screens (Consent, Care Brief) + the draft/approve gate; where no endpoint exists (Consent, Care Brief content), drive it from the demo-user data client-side.
+- **Honesty cues:** `LIVE` chips ONLY on genuinely-live actions. Guardian is a wrapper band, never a tile. SACH is "physio/rehab," never "polyclinic."
 
 ---
 
 ## 2. Routing & navigation
 
-`mode` is carried in the query string throughout (matches the current `?mode=` pattern; simplest for the demo, no global store needed). `persona` is derived from `mode`.
+`mode` stays in the query string (cosmetic label). Identity/state is carried in `sessionStorage`
+(`demoUser`, `careProfile`, `userLocation`, `autopilotAdapters`) exactly as the current code does —
+the Consent step writes the same keys so downstream screens are unchanged.
 
-- `/` — Landing → `/consent?mode=self|caregiver`
-- `/consent` — Consent (new) → `/chat?mode=…`
-- `/chat` — Conversation + Living Care Profile → `/pathway?mode=…`
-- `/pathway` — Pathway → `/autopilot?mode=…`
-- `/autopilot` — Autopilot (dark) → `/handover?mode=…`
-- `/handover` — Care Brief (new)
+- `/` — Landing → `/onboard?mode=self|caregiver` (new user) or `/login` (persona picker) — **existing**
+- `/login` — demo-user picker → seeds sessionStorage → **`/consent?mode=…`** (was `/chat`) — existing, reskin + reroute
+- `/onboard` — name/age + location → seeds sessionStorage → **`/consent?mode=…`** (was `/chat`) — existing, reskin + reroute
+- `/consent` — **new** Singpass/MyInfo consent gate → `/chat?mode=…`
+- `/chat` — Conversation + Living Care Profile → `/pathway?mode=…` — existing
+- `/pathway` — Pathway → `/autopilot` — existing
+- `/autopilot` — Autopilot (dark, `AgentWorkspace`) → `/handover` — existing, reskin + add gate
+- `/handover` — **new** Care Brief finale
 
-`/chat`, `/pathway`, `/autopilot` already exist (under `app/(main)/…` except autopilot which has its own dark layout); `/consent` and `/handover` are new. The **cream → dark transition** into Autopilot should feel intentional (short crossfade on navigation).
+`/chat`, `/pathway` live under `app/(main)/…` (shared cream `Header`); `/login`, `/onboard`,
+`/autopilot` are standalone (own headers). `/consent` and `/handover` are new — `/consent` standalone
+(modal-on-cream), `/handover` standalone (warm paper). The **cream → dark transition** into Autopilot
+should feel intentional (short crossfade).
 
 ---
 
@@ -131,24 +172,24 @@ Also remove hardcoded hex in components (`#EDE4D4` chat bubbles, `#3A1E10` servi
 
 The new shapes **replace** the current `lib/types.ts` (rewrite, then update consumers + reshape `lib/mock-data.ts` — don't add a translation layer). Use discriminated/literal fields per the code-style rule.
 
-```ts
-export type Mode = "self" | "caregiver";
-export type PersonaId = "mdm_tan" | "mr_lim";        // caregiver→mdm_tan, self→mr_lim
+> **Reconciliation:** the current `lib/types.ts` (`CareProfile` as flat strings) and `lib/demo-users.ts`
+> (`DemoUser` with 4 personas) already exist and are wired into chat/pathway/feeds. **Extend, don't
+> rewrite.** Add the view-model fields below alongside the existing types; evolve `CareProfile` field
+> values into `{ value, source, justUpdated }` (or add a parallel `profileMeta` map) rather than
+> replacing the working shape and breaking the backend `profileUpdate` patch path.
 
-// ── Living Care Profile ──
+```ts
+export type Mode = "self" | "caregiver";              // cosmetic label (URL)
+// Persona identity is the existing DemoUser["id"]: "mdm-tan" | "mr-lim" | "mrs-wong" | "uncle-raj"
+
+// ── Living Care Profile (view model over CareProfile) ──
 export type FieldSource = "myinfo" | "chat";          // myinfo → "✓ MyInfo"; chat → "from chat"
-export interface ProfileField {
-  key: string;                // "mobility"
-  label: string;              // "Mobility"
-  value: string;
+export interface ProfileFieldMeta {
   source: FieldSource;
   justUpdated?: boolean;      // drives ckPulse; cleared ~2s after set
 }
-export interface LivingCareProfile {
-  fields: ProfileField[];
-  filledCount: number;        // "6 of 8 fields"
-  totalCount: number;
-}
+// keyed by CareProfile field name, e.g. { financialTier: { source: "myinfo" }, mobility: { source: "chat", justUpdated: true } }
+export type ProfileMeta = Partial<Record<keyof CareProfile, ProfileFieldMeta>>;
 
 export interface Message {
   id: string;
@@ -191,25 +232,23 @@ export interface ConsentField { label: string; value?: string; subcopy?: string;
 
 ### Persona model
 
-`mode` (from URL) → `PersonaId` → a single per-persona seed dataset in `lib/mock-data.ts`:
+The existing `DemoUser` (`lib/demo-users.ts`) is the persona source of truth and is already selected at
+`/login` and seeded into `sessionStorage`. **Extend `DemoUser`** with the fields the design's new
+screens need, rather than adding a parallel `PersonaData` map:
 
 ```ts
-interface PersonaData {
-  id: PersonaId;
-  mode: Mode;
-  displayName: string;          // "Tan Siew Hua, 78" / "Lim Boon Keng, 72"
-  operator: string;             // "Wei Ling (daughter)" / "Mr Lim himself"
-  notifiedContact: string;      // "Wei Ling" / "Daughter in London"
-  consentCopy: string;          // mode-aware consent sentence
-  consentFields: ConsentField[];
-  profile: LivingCareProfile;
-  pathway: PathwayItem[];
-  services: AutopilotService[];
-  careBrief: { situation: string; cadence: string; actions: string[] };
-}
+// add to the existing DemoUser interface in lib/demo-users.ts
+profileMeta?: ProfileMeta;                              // which fields are MyInfo-verified vs from chat
+consent?: { copy: string; fields: ConsentField[] };     // Consent screen content (mode-aware)
+careBrief?: { situation: string; cadence: string; actions: string[]; consentsOnFile: string[] };
+// pathway/services divergence (differs|elevated tags) can be carried on the pathway/service data
 ```
 
-Keep it data-driven: one `personas: Record<PersonaId, PersonaData>` map; screens select by `mode`. Content/copy for both personas comes from the design README (don't re-author it). No global store — derive persona from `mode` and seed each screen. `useChatState` seeds from the persona's `profile` + opening `messages`; the simulated reply also patches a `justUpdated` field.
+Screens read the active persona from `sessionStorage.demoUser` (already the pattern). The `/onboard`
+path (no demo user) falls back to a minimal default persona. Content/copy comes from the design README +
+`demo-users.ts` — don't re-author it. `useChatState` already seeds chat from the demo user; the
+"just updated" pulse is driven by toggling `profileMeta[field].justUpdated` when a `profileUpdate`
+patch arrives.
 
 ---
 
@@ -229,19 +268,23 @@ Bespoke Tailwind components (no UI lib). Suggested contracts:
 - `ConsentRow({ field, mode })` — check badge + label + optional masked value/subcopy.
 - `ProfileFieldCard({ field, mode })` — label + provenance marker + value; `justUpdated` applies mode-color border + "just updated" pill + `ckPulse` ring.
 - `PathwayColumn({ group, items, mode })` + `PathwayItemCard({ item, mode })`.
-- `ServiceCard({ service, mode })` — dark card; renders draft (dashed + Approve/Edit) / running (progress bar) / done (✓ + optional LIVE).
 
-Reuse the existing `components/ui/StatusBadge.tsx` and `components/pathway/PathwayColumn.tsx` by reshaping, not duplicating; consolidate the duplicated color maps into one token-driven helper.
+Autopilot uses the existing `WorkspacePanel` + `*Feed` components (recolored to the `autopilot-*`
+tokens) — **not** the design's standalone `ServiceCard` (that lives only in the orphaned dashboard).
+`StatusPill` and `LiveChip` are used inside the panels. Reshape `components/pathway/PathwayColumn.tsx`
+rather than duplicating; consolidate the duplicated color maps into one token-driven helper.
 
 ---
 
 ## 6. Per-screen composition (high level)
 
-- **Landing** — header (monogram + `TalkToHuman`), centered hero, two `ModeCard`s. Routes to `/consent?mode=`.
-- **Consent** — centered modal card with Singpass-red header band, `ModeChip`, mode-aware copy, ordered `ConsentRow`s (NRIC masked, DOB, address, income+subcopy, CPF), Guardian note box, `PrimaryButton`.
-- **Conversation** — split: chat column (bubbles + typing chip + input/send) | profile column (`ProfileFieldCard` list + "6 of 8"). Mobile: profile becomes a bottom pull-up sheet (must not disappear).
+- **Landing** — header (monogram + `TalkToHuman`), centered hero, two `ModeCard`s, "Sign in" → `/login`. Routes to `/onboard?mode=`.
+- **Login** — reskin the dark persona picker to the new tokens; route on select to `/consent?mode=`.
+- **Onboard** — reskin the name/age + location steps to the new tokens; finish → `/consent?mode=`.
+- **Consent** — centered modal card with Singpass-red header band, `ModeChip`, mode-aware copy, ordered `ConsentRow`s (NRIC masked, DOB, address, income+subcopy, CPF), Guardian note box, `PrimaryButton`. Writes/keeps the same sessionStorage keys, then → `/chat`.
+- **Conversation** — split: chat column (bubbles + typing chip + input/send) | profile column (`ProfileFieldCard` list + "n of 8"). Mobile: profile becomes a bottom pull-up sheet (must not disappear).
 - **Pathway** — header, 4 `PathwayColumn`s with `WhyTag`s + divergence tags, footer "Launch Autopilot →".
-- **Autopilot** — dark; header, `GuardianBand`, 2-col `ServiceCard` grid (comms full-width), footer summary + "Approve all". Draft→running→done state machine.
+- **Autopilot** — dark; **keep `AgentWorkspace` + the 5 live feeds**; add `GuardianBand` across the top, recolor panels to the autopilot tokens, add a **draft/approve gate** (summary footer + "Approve all") that holds the feeds before they auto-run, and `LIVE` cues on genuinely-live feed actions.
 - **Care Brief** — warm paper doc card: letterhead, two columns (situation / actions checklist / pathway open items | family contact, cadence, consents-on-file), Guardian footer line.
 
 ---
@@ -249,7 +292,7 @@ Reuse the existing `components/ui/StatusBadge.tsx` and `components/pathway/Pathw
 ## 7. Interactions
 
 - **Profile "just updated":** on each user message, the simulated reply patches one field → set `justUpdated=true` → `ckPulse` (~1.8s) → clear. MyInfo fields are verified at consent and never editable-from-chat.
-- **Draft-then-confirm:** all services start `draft`. "Approve all" (or per-card Approve) → each `running` (animate `progress`, "Filing…/Routing…/Enrolling…") → `done` after a short delay; WhatsApp + Calendar get `live`. Footer summary recomputes ("2 done · 2 running · 1 draft").
+- **Draft/approve gate (over `AgentWorkspace`):** on entry, the feeds are held in a "draft — awaiting approval" state (don't auto-fire their `POST`/poll effects yet). "Approve all" (or per-panel Approve) releases them; each panel then runs its existing live flow. Only ICCP may bypass the gate (escalate-to-human faster). Implement as a gate flag the feeds check before kicking off their effects — minimal change to each feed.
 - **Cream → dark:** short crossfade entering `/autopilot`.
 - **`ckPulse` keyframes** (mode-colored): teal `rgba(28,107,102,…)` caregiver / orange `rgba(217,116,46,…)` self — keep in `globals.css`.
 
@@ -264,10 +307,69 @@ Reuse the existing `components/ui/StatusBadge.tsx` and `components/pathway/Pathw
 
 ---
 
-## 9. Deferred (fill in when the branch settles / later passes)
+## 9. File-by-file build plan (post-merge review)
 
-- **File-by-file build plan** — to be finalized after reviewing the friend's updated branch (route files, component file paths, what to reshape vs. add).
-- **Backend wiring** — SSE `{reply, profile_patch}`, Singpass/MyInfo sandbox, real WhatsApp + Google Calendar, server-side session. Per `user-flows.md` §7 these are a separate layer after the UI is faithful.
+### 9.1 Codebase delta this reconciles against
+
+The teammate merge changed the app substantially vs. the original design assumptions:
+
+- **Autopilot** is now a live `AgentWorkspace` (5 backend-polling feed panels + Leaflet maps), not a static 5-card screen. **Decision: reskin + gate, keep the feeds.**
+- **Entry** is Landing → `/onboard` *or* `/login` (4 demo users in `lib/demo-users.ts`). **Decision: keep both, reskin, insert `/consent` before `/chat`.**
+- **Backend is real** — `/chat`, `/pathway`, and the integration feeds call `localhost:8000`. **Decision: visual pass only; don't remove working calls.**
+- **Care Brief / Consent / Guardian band / new palette / lucide-react** are not in the code yet. **Decision: build them.**
+- Orphans exist (`AutopilotDashboard.tsx`, `ServiceCard.tsx`, `mockAutopilotServices`, `mockMessages`) — clean up at the end.
+
+### 9.2 Plan by phase (file → action)
+
+**Phase 0 — Foundation**
+- `package.json` — add `lucide-react`.
+- `app/globals.css` — replace `@theme` with §3 tokens; update `body` bg→`cream`/text→`ink`; keep/extend `ckPulse` (mode-colored) + add a short crossfade utility.
+- `lib/types.ts` — **add** `FieldSource`, `ProfileFieldMeta`, `ProfileMeta`, `ConsentField`, `PathwayGroup`, `Divergence` (extend; don't break `CareProfile`/`PathwayColumnData`).
+- `components/ui/` — **new** shared kit: `ModeChip`, `TalkToHuman`, `WhyTag`, `ProvenanceMarker`, `StatusPill`, `LiveChip`, `GuardianBand`, `PrimaryButton`, `ConsentRow`, `ProfileFieldCard` (see §5 contracts).
+
+**Phase 1 — Persona data**
+- `lib/demo-users.ts` — extend `DemoUser` with `profileMeta`, `consent`, `careBrief`, and pathway/service `divergence` tags; fill content for Mdm Tan + Mr Lim (Mrs Wong / Uncle Raj inherit visual treatment + sensible defaults).
+
+**Phase 2 — Entry screens (reskin)**
+- `app/(main)/page.tsx` — reskin Landing hero; "Sign in"→`/login`; cards→`/onboard?mode=`.
+- `components/landing/ModeCard.tsx` — reskin to new tokens.
+- `app/login/page.tsx` — reskin dark persona picker; **reroute select → `/consent?mode=`**.
+- `app/onboard/page.tsx` — reskin steps; **finish → `/consent?mode=`**.
+- `components/layout/Header.tsx`, `components/ui/Logo.tsx` — reskin monogram; add `TalkToHuman`; fix/remove dead nav links (`/about`, `/resources`, `/coordinators`, `/help`).
+
+**Phase 3 — Consent (new)**
+- `app/consent/page.tsx` — **new**; Singpass-red band, `ModeChip`, mode-aware copy + `ConsentRow`s from `demoUser.consent`, Guardian note; preserves sessionStorage keys → `/chat?mode=`.
+
+**Phase 4 — Conversation**
+- `app/(main)/chat/page.tsx` — reskin split layout.
+- `components/chat/ChatPanel.tsx`, `ChatMessage.tsx`, `ChatInput.tsx` — reskin bubbles (tokens, radii), send button; replace hardcoded `#EDE4D4`.
+- `components/chat/LiveCareProfile.tsx` — rebuild as `ProfileFieldCard` list with `ProvenanceMarker` + "n of 8" + `justUpdated` pulse; mobile bottom pull-up sheet.
+- `hooks/useChatState.ts` — on `profileUpdate`, set `profileMeta[field].justUpdated=true`, clear after ~2s.
+
+**Phase 5 — Pathway**
+- `app/(main)/pathway/page.tsx` — reskin; footer "Launch Autopilot →".
+- `components/pathway/PathwayBoard.tsx`, `PathwayColumn.tsx` — 4 groups on new tokens; first-class `WhyTag`; `divergence` tags; consolidate the duplicated color map.
+
+**Phase 6 — Autopilot (reskin + gate, keep feeds)**
+- `app/autopilot/page.tsx` — add `GuardianBand`; draft/approve gate UI (footer summary + "Approve all"); crossfade-in.
+- `components/autopilot/AgentWorkspace.tsx` — hold feeds behind an approval gate flag; recolor; (optionally honour `autopilotAdapters` to show/hide panels — see deferred).
+- `components/autopilot/WorkspacePanel.tsx` — recolor to `autopilot-*` tokens; `StatusPill`; `LiveChip` slot.
+- `AICFeed.tsx`, `NursingFeed.tsx`, `ICCPFeed.tsx`, `MedicationFeed.tsx`, `TelegramFeed.tsx` — gate their auto-run `POST`/poll effects behind approval (ICCP may bypass); add `LIVE` cue only where genuinely live; recolor.
+- `components/autopilot/MiniMap.tsx`, `WorkspaceLog.tsx` — recolor to tokens.
+
+**Phase 7 — Care Brief (new)**
+- `app/handover/page.tsx` — **new**; warm paper doc from `demoUser.careBrief` + profile + consents + Guardian footer line.
+- `app/autopilot/page.tsx` — footer/next → `/handover`.
+
+**Phase 8 — Responsive, a11y, cleanup**
+- Mobile reflows (chat pull-up, pathway stack, autopilot single column); a11y pass (§8).
+- Remove orphans once confirmed unreferenced: `components/autopilot/AutopilotDashboard.tsx`, `components/autopilot/ServiceCard.tsx`, `components/ui/StatusBadge.tsx` (if unused after `StatusPill`), `mockAutopilotServices`, `mockMessages`.
+
+### 9.3 Still deferred (later passes)
+
+- **Backend for the new bits:** Singpass/MyInfo sandbox behind Consent; a Care Brief endpoint; genuinely-live WhatsApp/Calendar `LIVE` proof.
+- **`autopilotAdapters` wiring:** make `AgentWorkspace` show/hide panels per the selected persona's `adapters` (currently stored but unused).
+- **Genuine mode fork** beyond demo-user selection (seeding/tone/notify by `?mode=`).
 
 ---
 

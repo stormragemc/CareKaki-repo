@@ -770,3 +770,62 @@ def pathway_edit(req: PathwayEditRequest):
     except Exception:
         columns = req.current_columns
     return {"columns": columns}
+
+
+# Natural-language editor for the *design* pathway (the persona board in the UI),
+# which carries richer per-item fields than the flat /pathway "columns" shape.
+class PathwayItemsEditRequest(BaseModel):
+    items: list[dict]
+    mode: str = "caregiver"
+    feedback: str
+
+
+_PATHWAY_GROUPS = {"this-week", "weeks-2-8", "apply-now", "single-point"}
+
+PATHWAY_ITEMS_EDIT_PROMPT = """You are editing a Singapore eldercare plan shown as a board of cards.
+The plan is a JSON array of items. Each item has:
+- "id": short kebab-case slug (keep existing ids stable; invent a new slug for a new item)
+- "group": EXACTLY one of "this-week", "weeks-2-8", "apply-now", "single-point"
+- "title": short card title
+- "whyTag": one short phrase explaining why this item belongs in the plan
+- "highlight": optional boolean — keep it only on the single coordinating item
+- "divergence": optional "differs" or "elevated", only when relevant
+
+Apply the caregiver's requested change: add, remove, reword, re-tag, or move items
+between groups as asked. Keep every other item unchanged. Always keep one
+"single-point" coordinating item. Return ONLY JSON of the form {"items": [ ... ]}."""
+
+
+@app.post("/pathway/edit-items")
+def pathway_edit_items(req: PathwayItemsEditRequest):
+    # PII-safe: redact anything sensitive the caregiver typed before it reaches the model/plan.
+    safe_feedback = guardian_check(req.feedback, adapter_name="pathway-edit", data_sources=["openai"])["safe_text"]
+
+    if oai is None:
+        return {"items": req.items, "edited": False}
+
+    prompt = (
+        f"{PATHWAY_ITEMS_EDIT_PROMPT}\n\n"
+        f"Care recipient mode: {req.mode}\n\n"
+        f"Current plan:\n{json.dumps(req.items)}\n\n"
+        f"Requested change:\n{safe_feedback}"
+    )
+    resp = oai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    try:
+        raw = json.loads(resp.choices[0].message.content)
+        items = raw.get("items") if isinstance(raw, dict) else raw
+        if not isinstance(items, list):
+            items = req.items
+    except Exception:
+        items = req.items
+
+    # Keep only well-formed items in valid groups so the board can never break.
+    cleaned = [
+        it for it in items
+        if isinstance(it, dict) and it.get("group") in _PATHWAY_GROUPS and it.get("title")
+    ]
+    return {"items": cleaned or req.items, "edited": True}

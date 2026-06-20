@@ -79,16 +79,24 @@ export default function AutopilotPage() {
               <p className="text-sm text-autopilot-muted">
                 {SERVICE_COUNT} services drafted · Guardian wrapping all {SERVICE_COUNT} · awaiting your approval
                 <span className="block text-xs text-autopilot-muted/70">
-                  Nothing irreversible runs until you approve. Coordinator escalation may proceed to reach a human faster.
+                  Nothing irreversible runs until you approve. Reject to adjust the plan, or coordinator escalation may proceed to reach a human faster.
                 </span>
               </p>
-              <button
-                type="button"
-                onClick={() => setApproved(true)}
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-full bg-self px-7 text-base font-semibold text-white transition-colors hover:bg-self-ink"
-              >
-                Approve all
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/pathway"
+                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-full border border-autopilot-hairline px-5 text-sm font-semibold text-autopilot-text transition-colors hover:bg-autopilot-card"
+                >
+                  Reject &amp; edit plan
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setApproved(true)}
+                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-full bg-self px-7 text-base font-semibold text-white transition-colors hover:bg-self-ink"
+                >
+                  Approve all
+                </button>
+              </div>
             </>
           )}
         </div>

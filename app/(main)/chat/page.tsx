@@ -57,7 +57,7 @@ function ChatPageInner() {
       {/* Split layout: chat (left) | profile (right, cream). On mobile the
           profile becomes a bottom pull-up sheet rendered by LiveCareProfile. */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 border-r border-hairline md:flex-[1.32]">
+        <div className="min-w-0 flex-1 border-r border-hairline pb-16 md:flex-[1.32] md:pb-0">
           <ChatPanel
             messages={messages}
             mode={mode}

@@ -101,8 +101,6 @@ export default function LiveCareProfile({ profile, profileMeta, mode }: LiveCare
             <FieldList profile={profile} profileMeta={profileMeta} mode={mode} />
           </div>
         </div>
-        {/* Spacer so the collapsed sheet never covers the last message/input. */}
-        <div className="h-16" aria-hidden="true" />
       </div>
     </>
   );

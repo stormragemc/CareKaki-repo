@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ModeCard from "@/components/landing/ModeCard";
 
 export default function LandingPage() {
@@ -19,15 +20,30 @@ export default function LandingPage() {
           mode="self"
           title="For myself"
           description="I'm a senior figuring things out — discharge, schemes, day-to-day support."
-          href="/chat?mode=self"
+          href="/onboard?mode=self"
         />
         <ModeCard
           mode="caregiver"
           title="For someone I care for"
           description="I'm a caregiver — parent, spouse, sibling — and I need a plan I can actually act on."
-          href="/chat?mode=caregiver"
+          href="/onboard?mode=caregiver"
         />
       </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 w-full max-w-xl mt-8">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400 uppercase tracking-wider">or</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      {/* Login button */}
+      <Link
+        href="/login"
+        className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+      >
+        Sign in with existing account
+      </Link>
     </div>
   );
 }

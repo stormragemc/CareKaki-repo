@@ -1,25 +1,69 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Message, CareProfile } from "@/lib/types";
-import { mockMessages, mockCareProfile } from "@/lib/mock-data";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INTEGRATION POINT: Replace the mock logic in `sendMessage` with a real
-// streaming API call to your LLM backend. The backend should:
-//   1. Send the user message + conversation history to the model
-//   2. Stream back the assistant response
-//   3. Extract entities and update `profile` in real time
-//
-// The hook's return shape is the stable contract — swap internals freely.
-// ─────────────────────────────────────────────────────────────────────────────
+const emptyProfile: CareProfile = {
+  name: "",
+  age: 0,
+  living: "",
+  mobility: "",
+  conditions: "",
+  caregiver: "",
+  financialTier: "",
+  recentEvent: "",
+};
+
+function loadInitialState(): { messages: Message[]; profile: CareProfile } {
+  if (typeof window === "undefined") {
+    return { messages: [], profile: emptyProfile };
+  }
+
+  const demoUserStr = sessionStorage.getItem("demoUser");
+  if (demoUserStr) {
+    try {
+      const demoUser = JSON.parse(demoUserStr);
+      const msgs: Message[] = (demoUser.chatHistory ?? []).map(
+        (m: { role: string; content: string }, i: number) => ({
+          id: String(i + 1),
+          role: m.role as "assistant" | "user",
+          content: m.content,
+        })
+      );
+      return { messages: msgs, profile: demoUser.profile };
+    } catch {}
+  }
+
+  const profileStr = sessionStorage.getItem("careProfile");
+  const profile = profileStr ? JSON.parse(profileStr) : emptyProfile;
+
+  const greeting: Message = {
+    id: "1",
+    role: "assistant",
+    content: "Hi — tell me about the person you're caring for. What just happened?",
+  };
+
+  return { messages: [greeting], profile };
+}
 
 export function useChatState() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [profile, setProfile] = useState<CareProfile>(mockCareProfile);
+  const [initial] = useState(loadInitialState);
+  const [messages, setMessages] = useState<Message[]>(initial.messages);
+  const [profile, setProfile] = useState<CareProfile>(initial.profile);
   const [isProfileUpdating, setIsProfileUpdating] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [emergency, setEmergency] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem("careProfile", JSON.stringify(profile));
+  }, [profile]);
+
+  const updateProfile = useCallback(
+    (patch: Partial<CareProfile>) =>
+      setProfile((prev) => ({ ...prev, ...patch })),
+    []
+  );
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
@@ -34,29 +78,42 @@ export function useChatState() {
     setIsThinking(true);
     setIsProfileUpdating(true);
 
-    // ── Replace below with real API call ──────────────────────────────────
-    await new Promise((r) => setTimeout(r, 1200));
-    const assistantMsg: Message = {
-      id: String(Date.now() + 1),
-      role: "assistant",
-      content:
-        "Thanks for sharing that. I've updated Mdm Tan's care profile and I'm refining the plan now.",
-    };
-    setMessages((prev) => [...prev, assistantMsg]);
-    setIsThinking(false);
-    // Simulate profile settling after response
-    await new Promise((r) => setTimeout(r, 600));
-    setIsProfileUpdating(false);
-    // ─────────────────────────────────────────────────────────────────────
-  }, []);
+    const messagePayload = [...messages, userMsg];
 
-  // Exposed for backend integration (e.g. SSE / WebSocket handlers can call
-  // these directly to push profile field updates from the server):
-  const updateProfile = useCallback(
-    (patch: Partial<CareProfile>) =>
-      setProfile((prev) => ({ ...prev, ...patch })),
-    []
-  );
+    try {
+      const res = await fetch("http://localhost:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: messagePayload }),
+      });
+      const data = await res.json();
+      const assistantMsg: Message = {
+        id: String(Date.now() + 1),
+        role: "assistant",
+        content: data.content,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      if (data.profileUpdate && Object.keys(data.profileUpdate).length > 0) {
+        updateProfile(data.profileUpdate);
+      }
+      if (data.emergency) {
+        sessionStorage.setItem("autopilotAdapters", JSON.stringify(data.adapters));
+        sessionStorage.setItem("autopilotTrigger", content);
+        setEmergency(true);
+      }
+    } catch {
+      const errorMsg: Message = {
+        id: String(Date.now() + 1),
+        role: "assistant",
+        content: "Sorry, I couldn't reach the backend. Is the server running?",
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsThinking(false);
+      setIsProfileUpdating(false);
+    }
+  }, [messages, updateProfile]);
 
   return {
     messages,
@@ -67,5 +124,6 @@ export function useChatState() {
     setInputValue,
     sendMessage,
     updateProfile,
+    emergency,
   };
 }

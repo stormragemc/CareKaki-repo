@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import LiveCareProfile from "@/components/chat/LiveCareProfile";
 import { useChatState } from "@/hooks/useChatState";
@@ -10,6 +10,8 @@ import { useChatState } from "@/hooks/useChatState";
 function ChatPageInner() {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") === "self" ? "self" : "caregiver";
+
+  const router = useRouter();
 
   const {
     messages,
@@ -19,7 +21,14 @@ function ChatPageInner() {
     inputValue,
     setInputValue,
     sendMessage,
+    emergency,
   } = useChatState();
+
+  useEffect(() => {
+    if (emergency) {
+      router.push("/autopilot");
+    }
+  }, [emergency, router]);
 
   const modeLabel =
     mode === "caregiver" ? "Caregiver mode" : "Self mode";

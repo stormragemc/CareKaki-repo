@@ -20,6 +20,7 @@ export function useChatState() {
   const [isProfileUpdating, setIsProfileUpdating] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [emergency, setEmergency] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem("careProfile", JSON.stringify(profile));
@@ -79,6 +80,11 @@ export function useChatState() {
     if (data.profileUpdate && Object.keys(data.profileUpdate).length > 0) {
       updateProfile(data.profileUpdate);
     }
+    if (data.emergency) {
+      sessionStorage.setItem("autopilotAdapters", JSON.stringify(data.adapters));
+      sessionStorage.setItem("autopilotTrigger", data.content);
+      setEmergency(true);
+    }
     setIsProfileUpdating(false);
 
   }, [messages]);
@@ -96,5 +102,6 @@ export function useChatState() {
     setInputValue,
     sendMessage,
     updateProfile,
+    emergency,
   };
 }

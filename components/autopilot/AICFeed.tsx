@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { DraftNotice } from "./WorkspaceLog";
 
 const MiniMap = dynamic(() => import("./MiniMap"), { ssr: false });
 
@@ -46,10 +47,11 @@ function getCareNeed() {
   return sessionStorage.getItem("autopilotTrigger") || "Elderly person needs care support and nearby services";
 }
 
-export default function AICFeed() {
+export default function AICFeed({ enabled = true }: { enabled?: boolean }) {
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
 
   useEffect(() => {
+    if (!enabled) return; // held behind the approval gate
     const care_need = getCareNeed();
     const { lat, lng } = getUserLocation();
 
@@ -78,7 +80,9 @@ export default function AICFeed() {
     };
 
     run();
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return <DraftNotice label="Drafted — eldercare match awaiting approval" />;
 
   return (
     <div className="flex flex-col gap-2">
@@ -100,7 +104,7 @@ export default function AICFeed() {
         <>
           <div className="flex flex-wrap gap-1 px-2 py-1">
             {phase.data.keywords_used.map((kw) => (
-              <span key={kw} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-teal/20 text-brand-teal">
+              <span key={kw} className="text-[10px] px-2 py-0.5 rounded-full bg-caregiver/25 text-caregiver-soft">
                 {kw}
               </span>
             ))}
@@ -131,35 +135,35 @@ export default function AICFeed() {
 
 function StepRow({ done, text }: { done: boolean; text: string }) {
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.03]">
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-autopilot-band">
       <span
         className={`w-1.5 h-1.5 shrink-0 rounded-full ${
-          done ? "bg-green-400" : "bg-brand-orange animate-pulse"
+          done ? "bg-status-done-dark" : "bg-status-running-dark animate-pulse"
         }`}
       />
-      <span className="text-xs text-white/80">{text}</span>
+      <span className="text-xs text-autopilot-text">{text}</span>
     </div>
   );
 }
 
 function ServiceCard({ rank, service }: { rank: number; service: RecommendedService }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 flex flex-col gap-1.5">
+    <div className="rounded-lg border border-autopilot-hairline bg-autopilot-band px-3 py-2.5 flex flex-col gap-1.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 w-5 h-5 rounded-full bg-brand-teal/20 text-brand-teal text-[10px] font-bold flex items-center justify-center">
+          <span className="shrink-0 w-5 h-5 rounded-full bg-caregiver/25 text-caregiver-soft text-[10px] font-bold flex items-center justify-center">
             {rank}
           </span>
-          <span className="text-xs font-semibold text-white truncate">{service.name}</span>
+          <span className="text-xs font-semibold text-autopilot-text truncate">{service.name}</span>
         </div>
         {service.distance_km != null && (
-          <span className="shrink-0 text-[10px] text-white/40">{service.distance_km} km</span>
+          <span className="shrink-0 text-[10px] text-autopilot-muted">{service.distance_km} km</span>
         )}
       </div>
-      <span className="text-[11px] text-white/50 leading-snug pl-7">{service.address}</span>
+      <span className="text-[11px] text-autopilot-muted leading-snug pl-7">{service.address}</span>
       <div className="flex items-center gap-3 pl-7">
-        <span className="text-[10px] text-white/30">Postal {service.postal_code}</span>
-        <span className="text-[10px] text-white/30">Score {service.total_score}</span>
+        <span className="text-[10px] text-autopilot-muted">Postal {service.postal_code}</span>
+        <span className="text-[10px] text-autopilot-muted">Score {service.total_score}</span>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import type { CareProfile } from "./types";
+import type { CareProfile, ConsentField, ProfileMeta } from "./types";
 
 export interface DemoUser {
   id: string;
@@ -12,6 +12,14 @@ export interface DemoUser {
   location: { address: string; lat: number; lng: number };
   profile: CareProfile;
   chatHistory: { role: "assistant" | "user"; content: string }[];
+  // ── Design view-model fields (added in Phase 1) ──
+  // Which profile fields are MyInfo-verified vs. assembled from chat; seeds the
+  // "just updated" pulse for the Conversation hero screen.
+  profileMeta?: ProfileMeta;
+  // Mode-aware copy + ordered rows for the Consent (Singpass/MyInfo) screen.
+  consent?: { copy: string; fields: ConsentField[] };
+  // Content for the Care Brief warm-handover finale.
+  careBrief?: { situation: string; cadence: string; actions: string[]; consentsOnFile: string[] };
 }
 
 export const DEMO_USERS: DemoUser[] = [
@@ -44,36 +52,108 @@ export const DEMO_USERS: DemoUser[] = [
       { role: "user", content: "My mum (78) had a fall. Discharged today. She lives alone." },
       { role: "assistant", content: "Okay, that sounds stressful. I've started assembling a care plan for Mdm Tan. Let me check nearby eldercare services and alert the coordinator." },
     ],
+    profileMeta: {
+      name: { source: "myinfo" },
+      age: { source: "myinfo" },
+      living: { source: "chat" },
+      mobility: { source: "chat", justUpdated: true },
+      conditions: { source: "chat" },
+      caregiver: { source: "chat" },
+      financialTier: { source: "myinfo" },
+      recentEvent: { source: "chat" },
+    },
+    consent: {
+      copy: "Mdm Tan Siew Hua consents to share the data below. Wei Ling (daughter) may then act on her behalf for this session.",
+      fields: [
+        { label: "NRIC", value: "S••••567A" },
+        { label: "Date of birth" },
+        { label: "Registered address" },
+        { label: "Income (from IRAS)", subcopy: "Used to match financial schemes" },
+        { label: "CPF contributions" },
+      ],
+    },
+    careBrief: {
+      situation:
+        "Mdm Tan, 78, fell at home and was discharged from SGH today. She lives alone in Ang Mo Kio and is unsteady on a walker. Her daughter Wei Ling is the primary caregiver — local, full-time, with two kids.",
+      cadence: "Monthly callback · Family present locally",
+      actions: [
+        "HCG filed (MyInfo income docs)",
+        "Home nurse Tue 9am (calendar invite sent)",
+        "AAC enrolment started",
+        "Family updated via WhatsApp",
+      ],
+      consentsOnFile: [
+        "Singpass verified",
+        "MyInfo: NRIC · DOB · address · income · CPF",
+        "Delegation: Wei Ling acts for Mdm Tan",
+      ],
+    },
   },
   {
     id: "mr-lim",
     name: "Mr Lim",
     avatar: "👴",
     role: "senior",
-    color: "#4EAAA2",
-    tagline: "Medication + pharmacy review",
-    scenario: "Senior feels dizzy after medication, needs HSA + openFDA medication review and pharmacy desk routing",
-    adapters: ["medication", "telegram"],
+    color: "#D9742E",
+    tagline: "Lives alone · loneliness after a fall",
+    scenario: "Self-managing senior who fell last week; lives alone in Toa Payoh with family overseas — needs Silver Support, home nursing, an Active Ageing Centre, and ICCP coordination",
+    adapters: ["aic", "nursing", "iccp", "telegram"],
     location: {
-      address: "Blk 85 Bedok North Street 4",
-      lat: 1.3290,
-      lng: 103.9300,
+      address: "Blk 79 Toa Payoh Central",
+      lat: 1.3343,
+      lng: 103.8563,
     },
     profile: {
       name: "Mr Lim",
       age: 82,
-      living: "With wife, ground-floor flat",
-      mobility: "Walks independently but slow",
-      conditions: "Type 2 diabetes, hypertension, on amlodipine + metformin",
-      caregiver: "Wife (76), son visits weekly",
-      financialTier: "Per-capita ≤ $2,000 · partial subsidy",
-      recentEvent: "Dizziness and giddiness after taking medication",
+      living: "Lives alone · Toa Payoh",
+      mobility: "Walks independently, slower since the fall",
+      conditions: "Recovering from a fall last week",
+      caregiver: "Daughter in London · keep informed",
+      financialTier: "Pension tier · Silver Support",
+      recentEvent: "Fell last week · home alone, family overseas",
     },
     chatHistory: [
       { role: "assistant", content: "Hi — tell me what's going on. How can CareKaki help?" },
-      { role: "user", content: "My father (82) feels very dizzy after taking his blood pressure and diabetes pills. He almost fell." },
-      { role: "assistant", content: "That's concerning. I'll run a medication review against Singapore's HSA registry and check for known side effects. Let me also route this to a pharmacy reviewer." },
+      { role: "user", content: "I had a fall last week. I'm okay now, but a bit shaken. I live on my own and my daughter is in London." },
+      { role: "assistant", content: "I'm glad you're alright. Living alone after a fall can feel unsettling — I'll line up some support nearby and check which schemes you qualify for. Let me start your care plan." },
     ],
+    profileMeta: {
+      name: { source: "myinfo" },
+      age: { source: "myinfo" },
+      living: { source: "chat" },
+      mobility: { source: "chat" },
+      conditions: { source: "chat" },
+      caregiver: { source: "chat" },
+      financialTier: { source: "myinfo" },
+      recentEvent: { source: "chat", justUpdated: true },
+    },
+    consent: {
+      copy: "You, Mr Lim Boon Keng, are sharing the data below so CareKaki can match schemes and arrange care for you.",
+      fields: [
+        { label: "NRIC", value: "S••••567A" },
+        { label: "Date of birth" },
+        { label: "Registered address" },
+        { label: "Income (from IRAS)", subcopy: "Indicates Silver Support eligibility" },
+        { label: "CPF contributions" },
+      ],
+    },
+    careBrief: {
+      situation:
+        "Mr Lim, 82, fell last week and is now home alone in Toa Payoh. His family is overseas — his daughter is in London — so loneliness is a real risk alongside his recovery.",
+      cadence: "Weekly check-in · No family in the room",
+      actions: [
+        "Silver Support filed",
+        "Home nurse Wed 10am (calendar invite sent)",
+        "AAC enrolment prioritised — addresses loneliness",
+        "Daughter in London updated via WhatsApp",
+      ],
+      consentsOnFile: [
+        "Singpass verified",
+        "MyInfo: NRIC · DOB · address · income · CPF",
+        "Consented for himself",
+      ],
+    },
   },
   {
     id: "mrs-wong",
@@ -104,6 +184,42 @@ export const DEMO_USERS: DemoUser[] = [
       { role: "user", content: "My mother (74) just had knee surgery. She needs wound care at home and I need help finding a nurse." },
       { role: "assistant", content: "Got it. I'll search for nearby home nursing providers with availability, and check what eldercare support is available in the Jurong area." },
     ],
+    profileMeta: {
+      name: { source: "myinfo" },
+      age: { source: "myinfo" },
+      living: { source: "chat" },
+      mobility: { source: "chat", justUpdated: true },
+      conditions: { source: "chat" },
+      caregiver: { source: "chat" },
+      financialTier: { source: "myinfo" },
+      recentEvent: { source: "chat" },
+    },
+    consent: {
+      copy: "Mrs Wong's mother consents to share the data below. Mrs Wong (daughter) may then act on her behalf for this session.",
+      fields: [
+        { label: "NRIC", value: "S••••567A" },
+        { label: "Date of birth" },
+        { label: "Registered address" },
+        { label: "Income (from IRAS)", subcopy: "Used to match financial schemes" },
+        { label: "CPF contributions" },
+      ],
+    },
+    careBrief: {
+      situation:
+        "Mrs Wong's mother, 74, was discharged from NUH after knee replacement and needs wound care at home. She lives with her daughter Mrs Wong, who works part-time.",
+      cadence: "Monthly callback · Family present locally",
+      actions: [
+        "Home nursing visits arranged",
+        "AIC eldercare support filed",
+        "ICCP coordinator looped in",
+        "Family updated via Telegram",
+      ],
+      consentsOnFile: [
+        "Singpass verified",
+        "MyInfo: NRIC · DOB · address · income · CPF",
+        "Delegation: Mrs Wong acts for her mother",
+      ],
+    },
   },
   {
     id: "uncle-raj",
@@ -134,6 +250,42 @@ export const DEMO_USERS: DemoUser[] = [
       { role: "user", content: "My uncle (85) was found collapsed at home. He lives alone and takes heart medication. We don't know how long he's been down." },
       { role: "assistant", content: "This is urgent. I'm activating all care systems: alerting your caregiver, escalating to the ICCP coordinator, checking his medication for interactions, and finding the nearest eldercare and nursing support." },
     ],
+    profileMeta: {
+      name: { source: "myinfo" },
+      age: { source: "myinfo" },
+      living: { source: "chat" },
+      mobility: { source: "chat" },
+      conditions: { source: "chat" },
+      caregiver: { source: "chat" },
+      financialTier: { source: "myinfo" },
+      recentEvent: { source: "chat", justUpdated: true },
+    },
+    consent: {
+      copy: "You, Uncle Raj, are sharing the data below so CareKaki can match schemes and arrange care for you.",
+      fields: [
+        { label: "NRIC", value: "S••••567A" },
+        { label: "Date of birth" },
+        { label: "Registered address" },
+        { label: "Income (from IRAS)", subcopy: "Used to match financial schemes" },
+        { label: "CPF contributions" },
+      ],
+    },
+    careBrief: {
+      situation:
+        "Uncle Raj, 85, was found collapsed at home and lives alone with no primary caregiver — his nephew visits twice a week. He has heart failure and a history of falls.",
+      cadence: "Weekly check-in · No family in the room",
+      actions: [
+        "Emergency escalation to ICCP coordinator",
+        "Home nursing arranged",
+        "Medication review against HSA registry",
+        "Nephew alerted via Telegram",
+      ],
+      consentsOnFile: [
+        "Singpass verified",
+        "MyInfo: NRIC · DOB · address · income · CPF",
+        "Consented for himself",
+      ],
+    },
   },
 ];
 

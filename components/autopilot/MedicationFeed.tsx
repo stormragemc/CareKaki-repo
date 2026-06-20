@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DraftNotice } from "./WorkspaceLog";
 
 interface MedLogEntry {
   from: "system" | "bot" | "user";
@@ -10,9 +11,9 @@ interface MedLogEntry {
 }
 
 const toneDot: Record<string, string> = {
-  default: "bg-white/30",
-  success: "bg-green-400",
-  pending: "bg-brand-orange animate-pulse",
+  default: "bg-autopilot-muted",
+  success: "bg-status-done-dark",
+  pending: "bg-status-running-dark animate-pulse",
 };
 
 const fromLabel: Record<string, string> = {
@@ -22,20 +23,20 @@ const fromLabel: Record<string, string> = {
 };
 
 const fromColor: Record<string, string> = {
-  system: "text-purple-400",
-  bot: "text-blue-400",
-  user: "text-green-400",
+  system: "text-live-dark",
+  bot: "text-weeks-soft",
+  user: "text-status-done-dark",
 };
 
-export default function MedicationFeed() {
+export default function MedicationFeed({ enabled = true }: { enabled?: boolean }) {
   const [log, setLog] = useState<MedLogEntry[]>([]);
   const [triggered, setTriggered] = useState(false);
 
   useEffect(() => {
-    if (triggered) return;
-    setTriggered(true);
+    if (!enabled || triggered) return; // held behind the approval gate
 
     const trigger = async () => {
+      setTriggered(true);
       await new Promise((r) => setTimeout(r, 3000));
       try {
         let seniorName = "Senior";
@@ -65,9 +66,10 @@ export default function MedicationFeed() {
       } catch {}
     };
     trigger();
-  }, [triggered]);
+  }, [enabled, triggered]);
 
   useEffect(() => {
+    if (!enabled) return;
     const fetchLog = () => {
       fetch("http://localhost:8000/medication/log")
         .then((res) => res.json())
@@ -77,13 +79,15 @@ export default function MedicationFeed() {
     fetchLog();
     const interval = setInterval(fetchLog, 1500);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return <DraftNotice label="Drafted — medication review awaiting approval" />;
 
   if (log.length === 0) {
     return (
       <div className="flex items-center gap-2 px-2 py-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-        <span className="text-xs text-white/60">Scanning for medication concerns…</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-status-running-dark animate-pulse" />
+        <span className="text-xs text-autopilot-muted">Scanning for medication concerns…</span>
       </div>
     );
   }
@@ -91,16 +95,16 @@ export default function MedicationFeed() {
   return (
     <div className="flex flex-col gap-1.5">
       {log.map((entry, i) => (
-        <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/[0.03]">
+        <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-autopilot-band">
           <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${toneDot[entry.tone]}`} />
           <div className="flex flex-col gap-0.5 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className={`text-[10px] font-semibold ${fromColor[entry.from]}`}>
                 {fromLabel[entry.from] ?? entry.from}
               </span>
-              <span className="text-[10px] text-white/20">{entry.time}</span>
+              <span className="text-[10px] text-autopilot-muted">{entry.time}</span>
             </div>
-            <span className="text-xs text-white/80 leading-snug">{entry.text}</span>
+            <span className="text-xs text-autopilot-text leading-snug">{entry.text}</span>
           </div>
         </div>
       ))}

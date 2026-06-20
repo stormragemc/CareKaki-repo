@@ -1,0 +1,19 @@
+# Web build context (.) — deps & build output are regenerated in-image.
+node_modules
+.next
+out
+build
+.git
+.gitignore
+npm-debug.log*
+
+# Not part of the web image.
+backend
+docs
+terminals
+*.md
+.env
+.env.*
+.DS_Store
+.vscode
+.cursor

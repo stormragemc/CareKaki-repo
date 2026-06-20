@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from datetime import datetime
-import google.generativeai as genai
+from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+CHAT_MODEL = "gpt-4o-mini"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -98,16 +99,6 @@ member. Classify their message and return only a JSON object with these fields:
 
 Caregiver message: """
 
-chat_model = genai.GenerativeModel(
-    model_name="gemini-3.5-flash",
-    system_instruction=SYSTEM_PROMPT,
-)
-
-extraction_model = genai.GenerativeModel(
-    model_name="gemini-3.1-flash-lite",
-)
-
-
 class Message(BaseModel):
     role: str
     content: str
@@ -121,14 +112,14 @@ class PathwayRequest(BaseModel):
     profile: dict
 
 
-def to_gemini_history(messages: list[Message]):
-    return [
-        {
-            "role": "user" if msg.role == "user" else "model",
-            "parts": [msg.content],
-        }
-        for msg in messages
-    ]
+def to_openai_messages(messages: list[Message], system_prompt: str = ""):
+    msgs = []
+    if system_prompt:
+        msgs.append({"role": "system", "content": system_prompt})
+    for msg in messages:
+        role = "user" if msg.role == "user" else "assistant"
+        msgs.append({"role": role, "content": msg.content})
+    return msgs
 
 
 def send_telegram_message(chat_id: int, text: str, buttons: list[list[str]] | None = None):
@@ -167,25 +158,26 @@ def get_telegram_log():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    history = to_gemini_history(request.messages[:-1])
-    last_message = request.messages[-1].content
-
     # Main chat response
-    session = chat_model.start_chat(history=history)
-    response = session.send_message(last_message)
-    reply = response.text
+    chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
+    chat_resp = oai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=chat_messages,
+    )
+    reply = chat_resp.choices[0].message.content
 
-    # Profile extraction using cheaper model
+    # Profile extraction
     conversation_text = "\n".join(
         f"{m.role}: {m.content}" for m in request.messages
     )
-    extraction = extraction_model.generate_content(
-        f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}",
-        generation_config={"response_mime_type": "application/json"},
+    extraction_resp = oai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[{"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}],
+        response_format={"type": "json_object"},
     )
 
     try:
-        profile_update = json.loads(extraction.text)
+        profile_update = json.loads(extraction_resp.choices[0].message.content)
     except Exception:
         profile_update = {}
 
@@ -196,13 +188,20 @@ def chat(request: ChatRequest):
 def pathway(request: PathwayRequest):
     prompt = f"{PATHWAY_PROMPT}\n\nCare profile:\n{json.dumps(request.profile)}"
 
-    response = chat_model.generate_content(
-        prompt,
-        generation_config={"response_mime_type": "application/json"},
+    resp = oai.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
     )
 
     try:
-        columns = json.loads(response.text)
+        raw = json.loads(resp.choices[0].message.content)
+        if isinstance(raw, list):
+            columns = raw
+        elif isinstance(raw, dict):
+            columns = next((v for v in raw.values() if isinstance(v, list)), [])
+        else:
+            columns = []
     except Exception:
         columns = []
 
@@ -257,19 +256,20 @@ async def telegram_webhook(request: Request):
         log_telegram("bot", reply_text)
         return {"ok": True}
 
-    # Free-text reply — send to Gemini for classification
+    # Free-text reply — send to OpenAI for classification
     if "message" in update and "text" in update["message"]:
         chat_id = update["message"]["chat"]["id"]
         text = update["message"]["text"]
         log_telegram("user", text)
 
-        classification = extraction_model.generate_content(
-            f"{CLASSIFY_PROMPT}{text}",
-            generation_config={"response_mime_type": "application/json"},
+        classify_resp = oai.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[{"role": "user", "content": f"{CLASSIFY_PROMPT}{text}"}],
+            response_format={"type": "json_object"},
         )
 
         try:
-            result = json.loads(classification.text)
+            result = json.loads(classify_resp.choices[0].message.content)
         except Exception:
             result = {}
 

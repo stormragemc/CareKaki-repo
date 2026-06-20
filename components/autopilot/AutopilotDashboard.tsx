@@ -15,11 +15,22 @@ export default function AutopilotDashboard({ services }: AutopilotDashboardProps
           The agent doesn&apos;t prepare the work.
         </h2>
         <p className="text-brand-orange text-lg italic font-serif">
-          It does the work — six services, in parallel, right now.
+          It does the work — five services, in parallel, right now.
         </p>
       </div>
 
-      {/* 3 × 2 grid */}
+      {/* Guardian shield — wraps every service, not a tile of its own */}
+      <div className="flex flex-col gap-2 rounded-xl border border-brand-teal/40 bg-brand-teal/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <span className="flex items-center gap-2 text-sm font-semibold text-white">
+          <span aria-hidden="true">🛡️</span>
+          Guardian — all actions under Responsible AI
+        </span>
+        <span className="text-xs text-white/60">
+          No medical advice · PDPA scrubbed · human one click away
+        </span>
+      </div>
+
+      {/* Service grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {services.map((service) => (
           <ServiceCard key={service.id} service={service} />

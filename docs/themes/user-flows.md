@@ -1,323 +1,243 @@
-# CareKaki — User Flows (Build Guide)
+# CareKaki — Use Cases & User Flows (Build Guide)
 
-> Concrete, end-to-end user journeys derived from `product-source-of-truth.md` and
-> `slide-fixes.md` (the canonical product spec). This doc maps **every step** to:
-> the **screen**, the **service / API call** behind it, and whether each integration is
-> **REAL** or **SIMULATED**. It also includes a per-step **build-gap analysis** against the
-> current codebase, plus a 10-minute demo run-of-show.
+> **Use-case-first.** Each entry starts from a real situation a person shows up with (the
+> "job to be done"), then the **flow** is *how they tackle it in the app*. Every step maps to a
+> **screen**, the **service / API** behind it, and whether each integration is **REAL** or
+> **SIMULATED**. Derived from `product-source-of-truth.md` and `slide-fixes.md` (canonical spec).
 >
-> When this doc conflicts with product *intent*, the source-of-truth wins. This file is the
-> operational bridge between that intent and the code.
+> Structure: **§1 legend → §2 the screens (shared building blocks) → §3 flagship use cases
+> (end-to-end) → §4 building-block use cases → §5 extra use cases (strengthen the pitch) →
+> §6 divergence → §7 build-gap analysis → §8 demo run-of-show.**
 
 ---
 
-## 0. Decisions locked (read first)
-
-These were resolved with the team and are assumed throughout:
+## 0. Decisions locked
 
 | Decision | Resolution |
 |---|---|
-| **Consent placement** | Singpass/MyInfo is a **gate after landing, before conversation** (means-tested fields are ready before the chat starts; matches §6c "consents once at onboarding"). |
-| **Caregiver delegation** | In caregiver mode, **Mdm Tan (the senior) consents** at onboarding so **Wei Ling acts on her behalf** (§6c delegation). |
-| **Medication review** | **Pathway-only** (Weeks 2–8). Autopilot stays at the **canonical 5 services**. |
-| **Warm handover** | A **dedicated Care Brief finale screen** ("what Aunty Mei sees"), not just a tile. |
-| **Persona ↔ mode** | **Bound for the demo:** caregiver mode = Mdm Tan, self mode = Mr Lim. |
-| **LLM** | Flows are model-agnostic ("the LLM / reasoning plane"). **Target = Claude Sonnet 4.6 via Vertex AI**; **current code = Gemini** (see Build note). |
+| Consent placement | Singpass/MyInfo is a **gate after landing, before conversation**. |
+| Caregiver delegation | **Mdm Tan (senior) consents**; **Wei Ling acts on her behalf** (§6c). |
+| Medication review | **Pathway-only**; Autopilot stays at the **canonical 5 services**. |
+| Warm handover | **Dedicated Care Brief finale screen** ("what Aunty Mei sees"). |
+| Persona ↔ mode | **Bound:** caregiver = Mdm Tan, self = Mr Lim. |
+| LLM | Model-agnostic in flows. **Target = Claude Sonnet 4.6 via Vertex AI**; **current = Gemini**. |
 
-**Build note — LLM drift:** the design spec (`prototype-design.md` §3) specifies Claude Sonnet 4.6;
-the live backend (`backend/main.py`) currently calls Gemini. Target is Claude on **Vertex AI**
-(bills through GCP, usable against the $300 GCP trial credit; demo token cost is negligible).
-Switching is: enable Vertex AI API → request Claude Sonnet 4.6 in Model Garden → point the
-Anthropic SDK at the Vertex endpoint with `gcloud` auth. The flows below do not depend on which
-model is used.
-
-**Build note — Singpass/MyInfo sandbox setup time (verify early, added in judge-review pass):**
-§6b gives WhatsApp a precise demo-vs-production timeline; Singpass/MyInfo doesn't have an
-equivalent yet. Before relying on Stage 1 for the live demo, confirm how long sandbox
-access/setup actually takes for this team (account registration, redirect URIs, test personas)
-and document it here the same way. Right now this is an open risk, not a known quantity.
+**Build note (LLM drift):** `backend/main.py` currently calls Gemini; design spec §3 specifies
+Claude Sonnet 4.6. Target route = Claude on **Vertex AI** (bills through GCP, covered by the $300
+trial credit; demo token cost is negligible). Flows do not depend on the model choice.
 
 ---
 
-## 1. Integration legend (§6a posture: anchor real, simulate the rest — never substitute)
+## 1. Integration legend (§6a: anchor real, simulate the rest — never substitute)
 
-| Tag | Meaning | In these flows |
+| Tag | Meaning | Members |
 |---|---|---|
-| 🟢 **REAL** | Genuinely live in the demo | **WhatsApp** (Meta Business Cloud API), **Singpass + MyInfo** (official **sandbox**, real consent flow in test mode), **Google Calendar** (real nurse-visit invite) |
-| 🟡 **SIMULATED** | Simulated against the agency's real interface; going live is a partnership/data-governance step, not engineering | **AIC** Home Caregiving Grant, **Home Nursing** (HNF / NTUC Health), **ICCP / Care Corner** routing, **polyclinic / medication** *(medication review is pathway-only — see Decisions Locked above — not an Autopilot integration)* |
-| ⚙️ **ORCHESTRATION** | Always real — fan-out, async state, status progression | The Autopilot Orchestrator itself |
-
-> Q&A framing: *"The orchestration is live — you saw a real WhatsApp, a real calendar invite, and
-> identity + data flowing through the official Singpass/MyInfo sandbox. The agency actions (AIC,
-> ICCP, polyclinic) are simulated against their real interfaces, because going live there is a
-> partnership and data-governance approval, not engineering. The sandbox is the same door, just in
-> test mode."*
+| 🟢 **REAL** | Genuinely live in the demo | **WhatsApp** (Meta Business Cloud API), **Singpass + MyInfo** (official **sandbox**), **Google Calendar** |
+| 🟡 **SIM** | Simulated against the agency's real interface (partnership/data-governance gated, not engineering) | **AIC**, **Home Nursing** (HNF/NTUC), **ICCP / Care Corner**, **polyclinic / medication** |
+| ⚙️ **ORCH** | Always real — fan-out, async state, status progression | Autopilot Orchestrator |
+| 🛡️ **GUARD** | Cross-cutting Responsible-AI layer (wraps everything) | Guardian service |
 
 ---
 
-## 2. The shared 6-stage skeleton
+## 2. The screens (shared building blocks)
 
-Both personas run the **same engine**; only seeding, tone, and who-gets-notified diverge (§5).
+Every use case is built from these few screens/capabilities. Defined once here so each flow below
+can just name the screen instead of repeating the plumbing.
 
-```
-Stage 0          Stage 1                 Stage 2                    Stage 3        Stage 4                       Stage 5
-Landing  ──▶  Singpass + MyInfo  ──▶  Conversation /        ──▶  Pathway   ──▶  Autopilot                ──▶  Warm Handover
-"Who is       consent (gate)          Living Care Profile        (why-tags)     (5 services,                  / Care Brief
- this for?"   🟢 REAL (sandbox)        LLM + 🟢 MyInfo fields                    draft-then-confirm,           🟡 SIMULATED (ICCP)
-                                                                                under Guardian)
-```
-
-Guardian wraps **every** stage (PDPA scrub, no-medical-advice, traceability, one-click-to-human).
-It is a **layer/shield**, never a tile or a service in the count.
-
-| Stage | Screen | Service / API | Integrations |
-|---|---|---|---|
-| 0 Landing | `/` | none (routes to `/chat?mode=…`) | — |
-| 1 Consent | **new** `/consent` (or modal) | `web → agent /auth/singpass` (OIDC), then `/myinfo/consent` → signed fields | 🟢 Singpass + MyInfo (sandbox) |
-| 2 Conversation | `/chat` (split: chat + Living Care Profile) | `web → agent /conversation` → `{reply, profile_patch}` (SSE) | LLM (real); 🟢 means-tested fields from MyInfo; Guardian |
-| 3 Pathway | `/pathway` (4 columns + why-tags) | `agent /pathway` from session profile; Guardian provenance | reasoning real; 🟡 named services |
-| 4 Autopilot | `/autopilot` (Guardian shield bar on top) | `agent /autopilot/draft` → approve → `/autopilot/confirm` → SSE `service_update` | ⚙️ orchestration; mix of 🟢/🟡 per service (below) |
-| 5 Care Brief | **new** `/handover` | `agent /handover` → structured Care Brief | 🟡 ICCP / Care Corner |
-
-### The 5 Autopilot services (+ Guardian wrapper)
-
-| # | Service | Provider | Integration | Notes |
+| Screen | What it does | Route | Service / API | Integration |
 |---|---|---|---|---|
-| 1 | **Financial — Home Caregiving Grant** | AIC | 🟡 SIMULATED (filed with 🟢 MyInfo NRIC/income docs) | "filed with income docs" reconciles with "zero forms" because the docs come from MyInfo |
-| 2 | **Clinical — Home nurse visit** | Home Nursing Foundation / NTUC Health | 🟡 SIMULATED booking **+ 🟢 Google Calendar invite** | A real invite lands in the caregiver's calendar |
-| 3 | **Social — Active Ageing Centre enrolment** | AAC | 🟡 SIMULATED | The social-care agent; this is what diverges Mr Lim's loneliness case |
-| 4 | **Coordination — Care Corner / ICCP warm handover** ⭐ HERO | ICCP / Care Corner | 🟡 SIMULATED routing | Routed to least-loaded officer (Aunty Mei), Care Brief preloaded. **The one action that may bypass confirm — to escalate to a human faster, not to act autonomously** (§4 Beat 4) |
-| 5 | **Comms — WhatsApp to family** | Meta WhatsApp Business | 🟢 REAL | A real message lands on a real phone |
-| — | **Guardian** (wrapper, not a service) | — | — | Shield/status bar across the top: no medical advice · PDPA scrubbed · human one click away |
+| **Landing** | Mode select ("Who is this for?") | `/` | routes to `/chat?mode=self\|caregiver` | — |
+| **Consent** | Singpass login + MyInfo consent | **new** `/consent` | `web → agent /auth/singpass` (OIDC) → `/myinfo/consent` → signed fields seed profile | 🟢 Singpass/MyInfo (sandbox) |
+| **Conversation** | Chat + Living Care Profile | `/chat` | `agent /conversation` → SSE `{reply, profile_patch}` | LLM · 🟢 MyInfo fields · 🛡️ |
+| **Pathway** | 4-column plan with why-tags | `/pathway` | `agent /pathway` from session profile; provenance per item | 🟡 named services · 🛡️ |
+| **Autopilot** | 5 services, draft-then-confirm | `/autopilot` (Guardian shield bar) | `agent /autopilot/draft` → approve → `/autopilot/confirm` → SSE `service_update` | ⚙️ + 🟢/🟡 per service · 🛡️ |
+| **Care Brief** | Warm handover artifact | **new** `/handover` | `agent /handover` → structured Care Brief | 🟡 ICCP/Care Corner |
+| **Guardian** | Cross-cutting safety layer (every screen) | shield/banner | separate `guardian` service: PDPA scrub · no-medical-advice · trace · escalate | 🛡️ |
+| **WhatsApp** | Notification adapter (fires from Autopilot) | — | `agent` → WhatsApp Business Cloud API (swappable adapter) | 🟢 WhatsApp |
 
-### Draft-then-confirm mechanics (§4 Beat 4, §7 principle 3)
+### The 5 services inside Autopilot (+ Guardian wrapper)
 
-1. Autopilot **prepares all 5 as ready-to-send drafts**. Nothing irreversible has happened yet.
-2. User approves **per-service** or **"Approve all"** (one tap). Approved drafts transition to live status and progress over time via SSE (`pending → submitted/scheduled/active/routed`).
-3. The **only** confirm-bypass is the **ICCP human escalation** (get a coordinator faster) — never autonomous agency action.
+| # | Service | Provider | Integration |
+|---|---|---|---|
+| 1 | Financial — **Home Caregiving Grant** | AIC | 🟡 SIM (filed with 🟢 MyInfo NRIC/income) |
+| 2 | Clinical — **Home nurse visit** | HNF / NTUC Health | 🟡 SIM booking **+ 🟢 Google Calendar invite** |
+| 3 | Social — **Active Ageing Centre enrolment** | AAC | 🟡 SIM |
+| 4 | Coordination — **Care Corner / ICCP warm handover** ⭐ | ICCP / Care Corner | 🟡 SIM (may bypass confirm to escalate to a human faster) |
+| 5 | Comms — **WhatsApp to family** | Meta WhatsApp | 🟢 REAL |
+| — | **Guardian** (wrapper, not a tile) | — | 🛡️ shield bar on top |
 
----
-
-## 3. Flow A — Caregiver mode (Mdm Tan, 78 · daughter Wei Ling operates)
-
-**Persona:** Wei Ling (local, full-time, 2 kids) is overwhelmed; her mum Mdm Tan fell and was
-discharged from SGH this morning, lives alone. **Wei Ling types; Mdm Tan consented at onboarding.**
-
-### A0 — Landing
-- **Screen:** `/` — picks **"For someone I care for."**
-- **API:** routes to `/chat?mode=caregiver`.
-- **Integration:** —
-- **Tone:** caregiver framing ("…a plan you can actually act on").
-
-### A1 — Singpass login + MyInfo consent (delegation)
-- **Screen:** `/consent` — "Log in with Singpass" → MyInfo consent screen listing exactly the
-  requested fields (NRIC, DOB, address, **income from IRAS**, CPF).
-- **Delegation:** **Mdm Tan's** Singpass is used; the consent records that **Wei Ling may act on
-  her behalf**. (One-time onboarding consent — the answer to "whose Singpass?")
-- **API:** `web → agent /auth/singpass` (OIDC) → `/myinfo/consent` → returns signed fields →
-  seeds `CareProfile` means-tested fields + financial tier server-side.
-- **Integration:** 🟢 **REAL (Singpass/MyInfo sandbox, synthetic persona)**.
-- **Why it matters:** this is *how* "0 forms" is literally true — income/NRIC are verified from the
-  national source, not typed and not inferred from chat.
-
-### A2 — Conversation / Living Care Profile
-- **Screen:** `/chat` — left: chat; right: **Living Care Profile** filling in real time.
-- **What's said:** "My mum (78) had a fall. Discharged today. She lives alone." → "She needs a
-  walker. I work full-time, two kids."
-- **Profile assembled:** name, age, living (alone, lift access), mobility (walker after fall),
-  conditions, **caregiver context (Wei Ling, full-time + 2 kids)**, recent event (discharged SGH).
-  **Financial tier comes from MyInfo (A1), not the chat.**
-- **API:** `web → agent /conversation {session_id, message}` → SSE stream of assistant tokens +
-  `profile_patch` events → `LiveCareProfile` animates each field. Guardian runs PDPA scrub +
-  no-medical-advice on every turn.
-- **Integration:** LLM (real); 🟢 MyInfo-sourced fields; Guardian.
-
-### A3 — Pathway ("Not a list. A plan.")
-- **Screen:** `/pathway` — 4 columns with **why-this-for-you** tags.
-  - **This Week** — home-safety walk-through, walker + grab-bar fitting, caregiver basics (falls). *Why: "Lives alone post-discharge."*
-  - **Weeks 2–8** — Home Nursing Foundation visits, **physio/rehab at SACH** (NOT "polyclinic"), **medication review**. *Why: "Mobility limited; subsidy eligible."*
-  - **Apply Now** — **Home Caregiving Grant**, MediFund top-up, CHAS review. *Why: "Per-capita income within tier" (from MyInfo).*
-  - **Single Point** — ICCP case officer, family WhatsApp loop, monthly check-in. *Why: "Complex case + working caregiver."*
-- **API:** `agent /pathway?session_id=…` → 4 columns, each item with a `why` traced to a profile
-  fact; Guardian attaches/verifies provenance.
-- **Integration:** reasoning real; 🟡 named services. **Naming fix applied: drop "SACH polyclinic."**
-- **Escalation banner:** "This case is complex — a Care Corner coordinator can take it from here →
-  Launch Autopilot."
-
-### A4 — Autopilot (5 services, draft-then-confirm, under Guardian)
-- **Screen:** `/autopilot` (dark) — Guardian **shield bar** on top; 5 service cards as **drafts**.
-- **Draft contents (Mdm Tan):**
-  1. **HCG (AIC)** — drafted with MyInfo NRIC + income docs + discharge summary. 🟡 (+🟢 docs)
-  2. **Home nurse (HNF/NTUC)** — Tue 9am, lift access + Wei Ling's contact; **Google Calendar invite drafted**. 🟡 booking + 🟢 calendar
-  3. **AAC enrolment** — local centre near Mdm Tan. 🟡 *(present but secondary — family is in the room)*
-  4. **ICCP warm handover** ⭐ — routed to **Aunty Mei** (least-loaded), Care Brief preloaded. 🟡 *(may escalate immediately)*
-  5. **WhatsApp to Wei Ling** — plain-language summary + reassurance thread. 🟢 **REAL**
-- **API:** `agent /autopilot/draft` → user **Approve all** → `/autopilot/confirm` → SSE
-  `service_update` progresses statuses in parallel. Guardian gates each (`requires_human` where risky).
-- **Integration:** ⚙️ orchestration real; per-service 🟢/🟡 as above.
-
-### A5 — Warm handover / Care Brief (the hero)
-- **Screen:** `/handover` — the **Care Brief Aunty Mei receives**: profile summary, pathway,
-  actions taken, consents, contact = Wei Ling.
-- **API:** `agent /handover?session_id=…` → structured Care Brief.
-- **Integration:** 🟡 ICCP / Care Corner.
-- **Payoff:** *"When Aunty Mei calls tomorrow, she already knows everything. Wei Ling never repeats herself."*
-- **Notification:** WhatsApp to **Wei Ling** (🟢). Cadence: **single coordinator callback**.
+**Draft-then-confirm:** Autopilot prepares all 5 as drafts → user approves per-service or
+**Approve all** → statuses progress via SSE. Only the ICCP **human escalation** may bypass confirm.
 
 ---
 
-## 4. Flow B — Self mode (Mr Lim, 72 · operates for himself · daughter in London notified)
+## 3. Flagship use cases (end-to-end — these are the demo)
 
-**Persona clarity (§5 fix):** **Mr Lim self-navigates — he opens the app and types.** His daughter
-in London is a **notified family member, not the operator**. Same engine as Flow A; the *context*
-(no family in the room → loneliness risk, pension tier) produces a different plan.
+### UC-1 — "My mum was just discharged and I don't know where to start"
+- **Actor / mode:** Wei Ling (daughter), **caregiver mode**. She types; her mum **Mdm Tan, 78** consented at onboarding.
+- **Trigger:** Mdm Tan fell, discharged from SGH this morning, lives alone. Wei Ling works full-time + 2 kids, overwhelmed.
+- **Goal:** Turn chaos into one actionable plan — and have the app *do* the legwork.
+- **Flow:**
+  1. Picks "For someone I care for." — *Landing* · routes `/chat?mode=caregiver` · —
+  2. Logs in with **Mdm Tan's Singpass**; approves MyInfo (NRIC, DOB, address, income, CPF); consent records Wei Ling may act on her behalf. — *Consent* · `/auth/singpass`+`/myinfo/consent` · 🟢
+  3. Talks: "Mum, 78, fell, discharged today, lives alone… she needs a walker, I work full-time." Living Care Profile fills in real time; **financial tier comes from MyInfo, not the chat.** — *Conversation* · `/conversation` (SSE) · LLM + 🟢 + 🛡️
+  4. Reviews the pathway: This Week (home safety, walker + grab-bars) · Weeks 2–8 (home nursing, **physio/rehab at SACH**, medication review) · Apply Now (**Home Caregiving Grant**) · Single Point (ICCP, monthly check-in). Each carries a why-tag ("Lives alone post-discharge"). — *Pathway* · `/pathway` · 🟡 + 🛡️
+  5. Taps "Launch Autopilot" → reviews 5 drafts → **Approve all**: HCG filed w/ MyInfo docs (🟡+🟢) · home nurse Tue 9am **+ Google Calendar invite (🟢)** · AAC (🟡) · **ICCP routed to Aunty Mei** (🟡) · **WhatsApp to Wei Ling (🟢)**. — *Autopilot* · `/autopilot/draft`+`/confirm` (SSE) · ⚙️+🛡️
+  6. Sees the **Care Brief** that Aunty Mei will receive (profile + actions + consents + contact = Wei Ling). — *Care Brief* · `/handover` · 🟡
+- **Outcome:** A working plan, a real WhatsApp + real calendar invite landed, a coordinator briefed. *"When Aunty Mei calls tomorrow, Wei Ling never repeats herself."*
+- **Why it helps our case:** the canonical "navigation shortage → one plan, zero forms, the agent does the work" story end-to-end.
+- **Demo:** shown live (primary).
 
-### B0 — Landing
-- **Screen:** `/` — picks **"For myself."** → `/chat?mode=self`.
-- **Tone:** first-person, senior-facing ("…figuring things out").
-
-### B1 — Singpass login + MyInfo consent
-- **Screen:** `/consent` — **Mr Lim consents for himself** (no delegation wrinkle here).
-- **API:** same as A1; MyInfo returns Mr Lim's fields → **pension/Silver Support tier** derived
-  from income/CPF.
-- **Integration:** 🟢 REAL (sandbox).
-
-### B2 — Conversation / Living Care Profile
-- **Screen:** `/chat` — Mr Lim types in first person ("I had a fall, just got discharged, my
-  children are overseas").
-- **Profile diverges:** caregiver = **none local (daughter in London)**; the engine flags
-  **loneliness / no family in the room** as the key risk.
-- **Capture:** the **daughter's contact** is recorded as a **notified family member** (drives the
-  WhatsApp-to-London in B4) — explicitly *not* an operator.
-- **API:** same `/conversation` SSE; Guardian active.
-
-### B3 — Pathway
-- **Screen:** `/pathway` — same 4-column shape, **different content**:
-  - **This Week** — home safety, walker fitting, **but no local caregiver to train**. *Why: "Lives alone, family overseas."*
-  - **Weeks 2–8** — home nursing, physio/rehab at SACH, medication review. *Why: "Mobility limited."*
-  - **Apply Now** — **Silver Support Scheme** (pension tier), CHAS. *Why: "Pension-tier income (MyInfo)."*
-  - **Single Point** — ICCP case officer, **weekly check-in cadence**, WhatsApp loop to daughter. *Why: "No family in the room → weekly contact."*
-- **API:** `agent /pathway` (same endpoint; divergence is reasoned from differing inputs).
-- **Integration:** reasoning real; 🟡 named services.
-
-### B4 — Autopilot (5 services — note what changes)
-- **Screen:** `/autopilot` — same 5 + Guardian, **re-weighted**:
-  1. **Financial** — **Silver Support** (not HCG), filed with MyInfo data. 🟡 (+🟢)
-  2. **Home nurse (HNF/NTUC)** + **Google Calendar invite**. 🟡 + 🟢
-  3. **AAC enrolment** ⭐ — **elevated**, because the real risk is **loneliness**. 🟡
-  4. **ICCP warm handover** ⭐ — least-loaded officer; **weekly check-in** baked into the brief. 🟡
-  5. **WhatsApp to the daughter in London** — summary + reassurance to the overseas family. 🟢 **REAL**
-- **API:** same `/autopilot/draft` → `/autopilot/confirm` → SSE.
-- **Same engine, different plan** — this is the "reads the room" proof.
-
-### B5 — Warm handover / Care Brief
-- **Screen:** `/handover` — Care Brief notes **weekly cadence** + **overseas family contact**.
-- **API:** `agent /handover`.
-- **Notification:** WhatsApp to **daughter in London** (🟢). Cadence: **weekly check-in**.
+### UC-2 — "I had a fall and I'm managing on my own — my kids are overseas"
+- **Actor / mode:** **Mr Lim, 72**, **self mode**. **He opens the app and types himself.** His daughter in **London** is a **notified family member, not the operator** (§5 persona fix).
+- **Trigger:** Same fall + discharge as Mdm Tan, but no family in the room. Real risk = **loneliness**.
+- **Goal:** Get set up safely on his own, and keep his overseas daughter in the loop.
+- **Flow:** (same screens as UC-1, different result)
+  1. Picks "For myself." — *Landing* · `/chat?mode=self` · —
+  2. **Mr Lim consents for himself** via Singpass/MyInfo; income/CPF → **pension/Silver Support tier**. — *Consent* · `/auth/singpass`+`/myinfo/consent` · 🟢
+  3. Talks in first person; profile flags **no local caregiver, family overseas → loneliness risk**; records daughter's contact as a **notified family member**. — *Conversation* · `/conversation` · LLM + 🟢 + 🛡️
+  4. Pathway diverges: Apply Now = **Silver Support** (not HCG) · Single Point = **weekly check-in** · social = **AAC elevated**. Why-tags: "Lives alone, family overseas." — *Pathway* · `/pathway` · 🟡 + 🛡️
+  5. Autopilot, re-weighted: Silver Support (🟡+🟢) · home nurse **+ calendar (🟢)** · **AAC elevated (🟡)** · ICCP with **weekly cadence** (🟡) · **WhatsApp to the daughter in London (🟢)**. — *Autopilot* · `/autopilot/*` · ⚙️+🛡️
+  6. Care Brief notes weekly cadence + overseas family contact. — *Care Brief* · `/handover` · 🟡
+- **Outcome:** Same intent, **different plan** — proof CareKaki *reads the room* on one engine.
+- **Why it helps our case:** the "same engine, different person" differentiator; whole-person (social) care, not just medical.
+- **Demo:** shown live (primary, run after UC-1 as the contrast beat).
 
 ---
 
-## 5. Divergence at a glance (same engine, §5)
+## 4. Building-block use cases (the jobs that chain into the flagships)
 
-| Stage | Caregiver — **Mdm Tan, 78** | Self — **Mr Lim, 72** |
+These reuse the same screens/engine; each can stand alone or appear inside UC-1/UC-2.
+
+### UC-3 — "What financial help do I actually qualify for?"
+- **Actor:** either mode. **Goal:** stop guessing at schemes; get matched + filed without a form.
+- **Flow:** Singpass/MyInfo brings verified income/CPF (*Consent*, 🟢) → profile derives **financial tier** (*Conversation*) → pathway "Apply Now" lists only what they qualify for with why-tags (*Pathway*) → Autopilot **files the grant** (HCG or Silver Support) using MyInfo docs (*Autopilot* service 1, 🟡+🟢).
+- **Why it helps:** the literal proof of **"0 forms"** + means-tested data from the national source. Strongest answer to "how is it zero forms if you filed a grant?"
+- **Demo:** shown live (inside UC-1/UC-2); callable as its own talking point.
+
+### UC-4 — "I need to arrange care at home"
+- **Actor:** either mode. **Goal:** book ongoing clinical care without phone-tag across agencies.
+- **Flow:** pathway Weeks 2–8 surfaces home nursing + physio/rehab at SACH (*Pathway*) → Autopilot books the **home nurse (HNF/NTUC, 🟡)** and drops a **real Google Calendar invite (🟢)** with lift access + caregiver contact (*Autopilot* service 2).
+- **Why it helps:** a **real artifact** (calendar invite) proves the orchestration reaches the outside world; clinical-care coverage.
+- **Demo:** shown live (the calendar invite is a real anchor).
+
+### UC-5 — "I'm worried about being alone / isolated"
+- **Actor:** self mode esp. (Mr Lim). **Goal:** address loneliness, not just medical needs.
+- **Flow:** conversation surfaces isolation (*Conversation*) → Guardian-traced why-tag "no family in the room" → Autopilot **AAC enrolment (🟡)** elevated + **weekly check-in** cadence in the Care Brief (*Autopilot* service 3, *Care Brief*).
+- **Why it helps:** **whole-person / social care** is what makes CareKaki more than a medical directory; the divergence engine for UC-2.
+- **Demo:** shown live (inside UC-2).
+
+### UC-6 — "This is too much — I want a real person to take over"
+- **Actor:** either mode. **Goal:** hand off to a human who already has the full picture.
+- **Flow:** "one click to human" available on every screen (*Guardian*) → Autopilot routes to **least-loaded ICCP officer (Aunty Mei)** with **Care Brief preloaded** (*Autopilot* service 4, 🟡) → the *Care Brief* screen shows the brief. This is the **one action that may bypass confirm** (escalate faster).
+- **Why it helps:** the **warm handover** differentiator + Responsible-AI human-in-the-loop; Care Corner (the partner) is the entity that switches this on.
+- **Demo:** shown live (the hero/finale).
+
+### UC-7 — "Keep my family in the loop"
+- **Actor:** either mode. **Goal:** family stays informed without the user re-explaining.
+- **Flow:** caregiver/family contact captured at consent/conversation → Autopilot sends a **plain-language WhatsApp summary + reassurance thread (🟢)** to Wei Ling (UC-1) or the **daughter in London** (UC-2) (*Autopilot* service 5, via the *WhatsApp* adapter).
+- **Why it helps:** the **single genuinely-live integration** (real message, real phone); WhatsApp as a **swappable adapter** (SMS/email/Telegram later) is the scaling answer.
+- **Demo:** shown live (real WhatsApp lands).
+
+---
+
+## 5. Extra use cases (added to strengthen the pitch & Q&A)
+
+These map directly to the scoring criteria (Responsible AI, client-profile understanding, "not a
+directory") and to likely judge questions. Most are **Q&A / roadmap**, not core demo beats — flagged.
+
+### UC-8 — "Is this dangerous? Should I change her medication?" (clinical question)
+- **Goal:** the user asks something medical. **Flow:** Guardian **intercepts** the clinical question on the conversation stream (*Guardian* principle 1), **does not answer**, and routes to a human + offers the coordinator path (UC-6). — *Conversation* · `/conversation` → `guardian` classifier · 🛡️
+- **Why it helps:** live proof that **"no medical advice" is architectural, not a prompt** — and `guardian` is a real, separately-callable service (can demo it rejecting a medical payload in Q&A).
+- **Demo:** **Q&A demo** (call Guardian directly to show the rejection).
+
+### UC-9 — "I'm more comfortable in Mandarin / Malay / Tamil"
+- **Goal:** non-English speaker navigates in their language. **Flow:** conversation runs in-language (LLM, *Conversation*); profile stays **structured/language-independent**; MyInfo can carry preferred language; WhatsApp templates per language code (*WhatsApp*). — same screens, no re-engineering.
+- **Why it helps:** **multilingual is config, not a bolt-on** — directly answers the inclusivity question without over-claiming (demo stays English).
+- **Demo:** **Q&A** (architecture answer; soften any hard "languages" claim per slide-fixes §9).
+
+### UC-10 — "What happens to my NRIC and income data?"
+- **Goal:** user worries about privacy. **Flow:** consent screen lists **exactly** the MyInfo fields requested (*Consent*); Guardian **tokenises NRIC/income at ingest**, PII never leaves the regional boundary, redaction before logging (*Guardian* principle 2). — *Consent* + cross-cutting · 🟢 + 🛡️
+- **Why it helps:** **PDPA-aware by default**; trust is a feature. Pairs with the delegation answer.
+- **Demo:** **Q&A / shown at consent** (point at the explicit field list).
+
+### UC-11 — "My situation changed" (re-discharge, condition worsens, new info)
+- **Goal:** plan must update as life changes. **Flow:** user adds info in chat → **Living Care Profile updates** (*Conversation*) → pathway **re-reasons** (*Pathway*) → Autopilot drafts new/changed actions for approval (*Autopilot*).
+- **Why it helps:** proves it's a **Living** profile + an agent that re-plans — **not a one-shot form or a static directory.**
+- **Demo:** **Q&A / optional live** (add a fact, show the profile + plan shift).
+
+### UC-12 — "I'm a Care Corner coordinator — a handover just landed" (the partner side)
+- **Actor:** **Aunty Mei (ICCP coordinator)** — the *receiving* side. **Goal:** pick up a case already fully briefed.
+- **Flow:** Autopilot routes the case (UC-6) → coordinator opens the **inbound Care Brief**: profile, pathway, actions taken, consents, family contact, cadence. — coordinator view of the *Care Brief* · `agent /handover` · 🟡
+- **Why it helps:** shows the **two-sided value** and why **Care Corner (in the room) is the partner that switches ICCP routing on**; "the family never repeats themselves" from the coordinator's POV.
+- **Demo:** **Q&A / roadmap** (coordinator UI is not built — see gaps). Powerful to *describe* with the partner present.
+
+### UC-13 — "I started earlier and came back" (resume)
+- **Goal:** continuity across visits/devices. **Flow:** server-side session keyed by cookie restores profile + plan (design spec §4). — cross-cutting.
+- **Why it helps:** supports the **stateless-services-with-session-store** cloud-native story.
+- **Demo:** roadmap (in-memory session is demo-grade; persistence is post-demo).
+
+---
+
+## 6. Divergence at a glance (same engine — §5)
+
+| Dimension | Caregiver — **Mdm Tan (UC-1)** | Self — **Mr Lim (UC-2)** |
 |---|---|---|
-| Operator | **Wei Ling** (local, full-time, 2 kids) types | **Mr Lim himself** types |
-| Notified family | Wei Ling | **Daughter in London** |
-| Singpass/MyInfo | Mdm Tan consents; Wei Ling acts on behalf (delegation) | Mr Lim consents for himself |
-| Finance | **Home Caregiving Grant** | **Silver Support** (pension tier) |
-| Social | AAC present but secondary (family in room) | **AAC elevated** (loneliness is the risk) |
-| Check-ins | **Single coordinator callback** | **Weekly** check-in |
+| Operator | Wei Ling (local) | Mr Lim himself |
+| Notified family | Wei Ling | Daughter in London |
+| Singpass | Mdm Tan consents; Wei Ling acts on behalf | Mr Lim consents for himself |
+| Finance | Home Caregiving Grant | Silver Support |
+| Social | AAC secondary (family present) | **AAC elevated** (loneliness) |
+| Check-ins | Single coordinator callback | **Weekly** |
 | WhatsApp | To Wei Ling | To daughter in London |
 
 ---
 
-## 6. Build-gap analysis (target flow vs. current codebase)
+## 7. Build-gap analysis (per screen — use cases inherit these)
 
 Legend: ✅ built · 🟨 mocked/partial · ❌ missing.
 
-| Stage | Status | What exists today | What's mocked | What's missing |
+| Screen | Status | Today | Mocked | Missing |
 |---|---|---|---|---|
-| **0 Landing** | ✅/🟨 | `/` with `ModeCard`; mode passed via `?mode=` query | — | **⚠️ P0 risk:** Mode is a **label only** downstream — does not yet truly fork seeding/tone/notifications (§3 slide-fix requires genuine fork). This is the mechanic behind §5 "reads the room," the most differentiated demo beat — see the reordered build order below |
-| **1 Singpass/MyInfo** | ❌ | — | — | **Entire stage.** No `/consent` screen, no `/auth/singpass`, no `/myinfo/consent`, no sandbox wiring, no delegation handling |
-| **2 Conversation/Profile** | 🟨 | `/chat`, `useChatState` → `POST /chat`, live `LiveCareProfile` panel | Profile **pre-seeded with Mdm Tan mock** on load; transcript seeded from `mockMessages` | MyInfo-seeded means-tested fields; **Guardian** (no service); **server-side session** (state currently in `sessionStorage`); **Mr Lim seed**; SSE streaming (currently single JSON response); model is Gemini not Claude |
-| **3 Pathway** | 🟨 | `/pathway` calls `POST /pathway` (Gemini) | Falls back to `mockCareProfile`; why-tags exist in `mock-data.ts` | Server session (reads from `sessionStorage`, not a session store); Guardian provenance; **"SACH polyclinic" naming bug present** in `lib/mock-data.ts` |
-| **4 Autopilot** | 🟨 | `/autopilot` screen + `AutopilotDashboard` + `ServiceCard` | **Fully static** `mockAutopilotServices` | **No backend at all** (`/autopilot/draft`, `/autopilot/confirm`); **6 tiles incl. Guardian-as-tile** (must be **5 + Guardian wrapper/shield**); **no draft-then-confirm**; no SSE progression; **WhatsApp / Google Calendar / AIC / AAC / ICCP all absent**; header copy still says **"six services"** |
-| **5 Care Brief** | ❌ | — | — | **Entire stage.** No `/handover` screen, no Care Brief endpoint/artifact |
-| **Cross-cutting** | ❌ | — | — | **`guardian` service** (separate container); **k8s manifests** (`/k8s`); persona-switch / mode fork; SSE transport; Claude-on-Vertex swap |
+| **Landing** | ✅/🟨 | `/` + `ModeCard`, `?mode=` query | — | mode is a **label only** — doesn't yet fork seeding/tone/notifications |
+| **Consent** | ❌ | — | — | **entire screen** — no `/consent`, no `/auth`/`/myinfo`, no sandbox, no delegation |
+| **Conversation** | 🟨 | `/chat`, `useChatState`→`POST /chat`, live profile panel | **Mdm Tan mock pre-seeded**; transcript from `mockMessages` | MyInfo seeding; **Guardian**; **server session** (uses `sessionStorage`); **Mr Lim seed**; **SSE** (single JSON now); Claude swap |
+| **Pathway** | 🟨 | `/pathway` → `POST /pathway` (Gemini); SACH naming fixed | falls back to `mockCareProfile`; why-tags in `mock-data.ts` | server session; Guardian provenance |
+| **Autopilot** | 🟨 | `/autopilot` + dashboard; now **5 services + Guardian shield bar** (AAC added, medication moved to pathway, "five services" copy) | **static** `mockAutopilotServices` | **no backend**; **no draft-then-confirm**; no SSE; **real WhatsApp/Calendar/AIC/ICCP wiring absent** (cards present, integrations not live) |
+| **Care Brief** | ❌ | — | — | **entire screen** — no `/handover` screen/endpoint |
+| **Guardian** | ❌ | — | — | **no `guardian` service**; no medical-advice intercept (UC-8), PDPA tokenisation (UC-10), provenance, escalation |
+| **WhatsApp** | ❌ | — | — | no WhatsApp Business integration; no adapter abstraction |
+| Cross-cutting | ❌ | — | — | k8s manifests (`/k8s`); coordinator view (UC-12); persistence (UC-13); genuine mode fork |
 
-**Summary:** Stages 0, 2, 3 exist as a live-ish skeleton (single-shot, Gemini, mock-seeded);
-**Stages 1, 4 (real logic), and 5 are essentially greenfield.** The two highest-leverage demo
-beats — **MyInfo consent (Stage 1)** and **Autopilot draft-then-confirm with the WhatsApp +
-Calendar real anchors (Stage 4)** — are exactly the parts not yet built.
+**Reading:** Landing/Conversation/Pathway exist as a single-shot, Gemini, mock-seeded skeleton. The
+highest-leverage beats — **Consent, Autopilot (draft-then-confirm + real WhatsApp/Calendar), Care
+Brief, and Guardian** — are essentially greenfield. UC-3–7 depend on Autopilot/Care Brief; UC-8/10
+depend on Guardian; UC-12 needs a coordinator view.
 
-### Quick fixes already identifiable in code
-- `lib/mock-data.ts`: rename **"Physio at SACH polyclinic" / "Polyclinic SACH"** → "physio/rehab at SACH" (SACH is a community hospital).
-- `lib/mock-data.ts` + `AutopilotDashboard.tsx`: collapse Guardian tile into a **wrapper/shield**; reduce to **5 services**; change "six services" copy.
-- `mockAutopilotServices`: add **AAC** and **Google Calendar** artifacts; relabel medication out of Autopilot (pathway-only).
-
----
-
-## 7. Suggested build order (maps gaps → stages)
-
-1. **Backend skeleton + session + Guardian service** (unblocks everything; design spec §10.1–2).
-2. **Stage 1 — Singpass/MyInfo sandbox** (`/consent`, `/auth/singpass`, `/myinfo/consent`) — the "zero forms" proof.
-3. **Stage 2 wired to session + MyInfo seeding + SSE** (move off `sessionStorage`; add Mr Lim seed) **+ make the mode fork genuine here** (caregiver=Mdm Tan / self=Mr Lim seeding, tone, notifications) — *moved up from step 7 in the judge-review pass*, since this is the mechanic behind your most differentiated beat (§5) and is cheap relative to what follows.
-4. **Stage 3 from session + Guardian provenance** (+ apply the SACH naming fix).
-5. **Stage 4 — Autopilot backend: draft-then-confirm, 5 services, Guardian shield, SSE** + 🟢 **WhatsApp** + 🟢 **Google Calendar**.
-6. **Stage 5 — `/handover` Care Brief screen.**
-7. **k8s manifests + rehearsal** (include a dry run of the contingency plan in §9 below).
-8. **Claude-on-Vertex swap** — *optional, best-effort.* If it doesn't land in time, demo runs on Gemini; quietly drop "Claude Sonnet 4.6" from talking points for demo day rather than implying a swap happened on stage if it didn't.
+### Quick fixes — ✅ applied
+- `lib/mock-data.ts`: renamed "Physio at SACH polyclinic" → "Physio/rehab at SACH"; dropped "Polyclinic SACH" provider.
+- `lib/mock-data.ts`: Autopilot now the **canonical 5** (HCG, home nurse, **AAC**, Care Corner/ICCP, WhatsApp); **medication removed** (pathway-only); HCG copy reconciled to **MyInfo, no form**; home-nurse copy notes **Google Calendar invite**.
+- `components/autopilot/AutopilotDashboard.tsx`: **Guardian moved out of the grid into a shield bar** wrapping all services; "six services" → **"five services"**.
+- *Still display-only:* the 🟢 WhatsApp / Google Calendar and 🟡 AIC/ICCP integrations are represented as cards but not yet wired to live/simulated backends.
 
 ---
 
 ## 8. Demo run-of-show (~10 min live + ~10 min Q&A)
 
-With the longer slot you can show — not just narrate — the real anchors and both personas.
+| Time | Beat | Use case | Screen | Live proof |
+|---|---|---|---|---|
+| 0:00–0:30 | One front door | UC-1 start | Landing | the single choice |
+| 0:30–1:30 | **Consent** | UC-3 / UC-10 | Consent | 🟢 real sandbox consent; "this is how 0 forms is literally true" |
+| 1:30–3:00 | A conversation, not a form | UC-1 | Conversation | profile assembling; income from MyInfo |
+| 3:00–4:00 | Not a list, a plan | UC-1 | Pathway | why-tags traced to facts |
+| 4:00–6:00 | **Autopilot** | UC-3/4/7 | Autopilot | draft → **Approve all** → 🟢 **real WhatsApp** + 🟢 **real Calendar invite**; Guardian shield |
+| 6:00–7:00 | Warm handover | UC-6 | Care Brief | Care Brief preloaded for Aunty Mei |
+| 7:00–9:00 | Same engine, different plan | UC-2 (+UC-5) | re-run as Mr Lim | Silver Support, AAC elevated, weekly, WhatsApp to London |
+| 9:00–10:00 | Close | — | (deck) | 1 front door · 5 services under one Guardian · 0 forms |
 
-| Time | Beat | Screen | Live proof to point at |
-|---|---|---|---|
-| 0:00–0:30 | One front door, two ways in | `/` | The single choice |
-| 0:30–1:30 | **Singpass + MyInfo consent** | `/consent` | 🟢 Real sandbox consent screen — "this is how 0 forms is literally true" |
-| 1:30–3:00 | A conversation, not a form | `/chat` | Living Care Profile assembling; income field came from MyInfo, not chat |
-| 3:00–4:00 | Not a list, a plan | `/pathway` | Why-this-for-you tags traced to real facts |
-| 4:00–6:00 | **Autopilot** | `/autopilot` | Draft-then-confirm → **Approve all** → 🟢 **real WhatsApp lands on a phone** + 🟢 **real Google Calendar invite**; Guardian shield on top |
-| 6:00–7:00 | Warm handover | `/handover` | Care Brief preloaded for Aunty Mei |
-| 7:00–9:00 | **Same engine, different plan** | re-run as Mr Lim | Silver Support, AAC elevated, weekly check-in, WhatsApp to London |
-| 9:00–10:00 | Close | (deck) | 1 front door · 5 services under one Guardian · 0 forms |
-
-**Q&A-ready (have these answers loaded — see source-of-truth §6a/§6b/§6c + slide-fixes Q&A):**
-- *Real or simulated?* → orchestration live; WhatsApp + Calendar + Singpass/MyInfo real; AIC/ICCP/polyclinic simulated against real interfaces (partnership, not engineering).
-- *Zero forms with NRIC + income?* → Singpass login + MyInfo-on-consent.
-- *Whose Singpass for a caregiver?* → delegation; senior consents once at onboarding.
-- *Autopilot acting without permission?* → draft-then-confirm; only human-escalation bypasses confirm.
-- *Non-English speakers?* → multilingual is config, not re-engineering (LLM conversation + structured profile + per-template WhatsApp language codes).
-
----
-
-## 9. Contingency plan — what to do if a live integration falters
-
-*Added in a judge-review pass (2026-06-17). Everything in §8 above is happy-path; this section
-covers what the team actually does if something doesn't cooperate live.*
-
-| Risk | Fallback |
-|---|---|
-| **Singpass/MyInfo sandbox is slow or down** at the very first live step | Have a pre-authenticated session ready to drop into, or a ~20s pre-recorded clip of the real consent screen, so the demo doesn't stall before anything has been shown |
-| **WhatsApp send fails or is delayed** during Autopilot | Narrate over a pre-captured screenshot/recording of a successful send rather than waiting live for a retry |
-| **Google Calendar invite doesn't land instantly** | Same — have a screenshot of a real prior invite ready as backup |
-| **Venue Wi-Fi/network issues** | Have a full recorded run-through ready as a last resort |
-
-**On the Mr Lim re-run (7:00–9:00 in §8):** two minutes is not enough to live-click through a
-full five-stage journey a second time at the same pace as Mdm Tan's run. Decide explicitly which
-screens get a full live pass for Mr Lim versus which get a fast verbal callout over the §5
-divergence table, and rehearse that exact cut rather than discovering the time crunch live.
-
-**On persona generalization:** both personas are bound 1:1 to demo modes for the sake of a clean
-script (§0, "Persona ↔ mode"). Before demo day, run at least one informal test of the underlying
-engine against a made-up third scenario (not part of the rehearsed run) to find out whether it
-actually generalizes — so the team knows, rather than discovers live, whether a judge improvising
-a different scenario in Q&A would break it.
+**Q&A ammo (load these):** UC-8 (call Guardian live to reject a medical question) · UC-9 (multilingual = config) · UC-10 (PDPA/consent transparency) · UC-11 (Living profile re-plans) · UC-12 (coordinator side / why Care Corner is the partner) · real-vs-simulated framing (§1).
 
 ---
 
 *Anchored to `product-source-of-truth.md` and `slide-fixes.md`. If product intent changes, update
-those first, then mirror the change here.*
+those first, then mirror here.*

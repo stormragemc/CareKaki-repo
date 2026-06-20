@@ -1,0 +1,44 @@
+---
+description: Verify third-party API/product behavior with a web search before making confident claims. Don't rely on training data for Slack, Google, Firebase, Stripe, etc. Use when making any claim about what a third-party API/SDK/dashboard does or doesn't support, or when the user pushes back on such a claim.
+---
+
+# Third-Party API & Product Claims
+
+Before making a confident claim about how a third-party API, SDK, or product behaves, verify it with a web search. Training data goes stale. APIs add features. UIs change.
+
+## When to web-search before claiming
+
+Always search first for claims of the form:
+
+- "Slack/Google/Firebase/Stripe/... supports / doesn't support X"
+- "X is all-or-nothing" / "X requires Y scope" / "Y is optional"
+- "The dashboard has / doesn't have a setting for Z"
+- "This parameter was deprecated" / "This is the recommended approach"
+- "As of [year], the API behaves like..."
+
+Especially for any third-party surface your project integrates with — they ship changes quarterly.
+
+## When the user pushes back, search — don't restate
+
+If the user says "u sure?" / "is there a setting I need to turn on?" / "check the docs" — that's a signal my claim is wrong or incomplete. The correct response is:
+
+1. Web-search to verify (with the current year in the query, e.g. "Slack optional scopes 2026")
+2. If wrong, correct the claim and cite the source
+3. If right, provide the documentation link that confirms it
+
+Never just repeat the same claim more confidently. The user is almost always right when they push back on an API behavior claim.
+
+## Cite the source
+
+When stating a third-party behavior, include the documentation URL or changelog entry:
+
+- `https://docs.slack.dev/...`
+- `https://developers.google.com/...`
+- `https://firebase.google.com/docs/...`
+
+A claim with a citation is reviewable. A claim without one is a guess.
+
+## Prefer primary sources
+
+- Official docs > changelog > blog post > StackOverflow > random tutorial
+- Recent docs > old docs — use the year in the search query to bias toward current info

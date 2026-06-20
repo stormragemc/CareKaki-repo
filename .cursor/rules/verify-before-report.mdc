@@ -1,0 +1,33 @@
+---
+description: Always verify against the source of truth (code, running service, git log) before reporting status. Never report status from a plan doc, a summary table, or a script's existence. Use when claiming something is done / deployed / tested / configured, or when the user asks "is X done?", "have you verified?", "what's left?".
+---
+
+# Verify Before Reporting Status
+
+When the user asks "is X done?", "what's left?", "have you verified?", "is it deployed?", or similar status questions — **read the actual source of truth**, not a summary.
+
+## The Rule
+
+Before claiming anything is done, deployed, tested, or configured:
+
+1. **Read the code, not the plan doc.** Plan docs (`docs/plans/*.md`) drift. Summary tables in plan docs are often out of date. When in doubt, grep the code.
+2. **Hit the thing, don't just trust the command exited 0.** After a deploy, `curl` the health endpoint. After a build, check the artifact exists. After a DB migration, query the schema.
+3. **Check the live configuration, not the script that sets it.** A `deploy` script existing does not mean the binding is live. Query the running service / environment directly.
+
+## Examples
+
+| User question | Wrong | Right |
+|---|---|---|
+| "Is issue 6 done?" | Read the plan doc's status table | `rg` the code for the symptom the issue described |
+| "Is the API deployed?" | Report that the deploy script exited successfully | `curl https://.../health` and show the JSON response |
+| "Are the env vars configured for prod?" | Read the setup script | Query the live environment/service config |
+| "Did the rebase land all commits?" | Report "rebase successful" | `git log --oneline origin/main..HEAD` and list the commits |
+| "Is the test passing?" | "I've fixed the failing assertion" | Actually run the test |
+
+## When verification is cheap, always do it
+
+One extra tool call beats a round-trip with the user. If the user has to ask "have you verified?" once, that's a failure of this rule.
+
+## When verification is genuinely expensive
+
+Say so explicitly. E.g. "I can't run the app headlessly to verify the OAuth popup — you'll need to test it locally." Don't silently skip verification and report success.

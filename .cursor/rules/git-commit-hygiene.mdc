@@ -1,0 +1,47 @@
+---
+description: Push and PR-update hygiene, especially around rebases. Use when pushing after rebase/amend/reset, or updating an existing PR.
+---
+
+# Git Commit & Push Hygiene
+
+## After a rebase, always force-push with lease
+
+A plain `git push` will fail with non-fast-forward after `git rebase`. Default to:
+
+```bash
+git push --force-with-lease origin HEAD
+```
+
+Never use plain `--force` (clobbers upstream changes from collaborators). Never use plain `git push` expecting it to work after a rebase.
+
+If the user says "update the PR" or "push" after any of the following, use `--force-with-lease`:
+- `git rebase`
+- `git commit --amend`
+- `git reset` that moved HEAD backwards
+- Any interactive history rewrite
+
+## Updating an existing PR after a rebase
+
+When the user asks to "update the PR" on a rebased branch:
+
+1. Sanity-check the history: `git log --oneline origin/main..HEAD` — confirm the expected commits are present, nothing extra, nothing missing.
+2. `git push --force-with-lease origin HEAD`
+3. Find the PR: `gh pr list --head <branch> --json number,title,url` — report the PR URL back to the user.
+4. If review feedback was addressed during the rebase/fix session, consider posting a PR comment summarizing what changed. Use `gh pr comment <number> --body "..."` with a brief bullet list per issue addressed.
+
+## What a good "update the PR" response looks like
+
+```
+Pushed force-with-lease to feat/my-feature.
+
+PR: https://github.com/<owner>/<repo>/pull/123
+Commits now on the branch (3):
+  7e372f81 refactor: ...
+  f1232f31 feat: ...
+  ...
+```
+
+## Never
+
+- Never `git push --force` without `--with-lease`. If `--with-lease` is rejected, stop and show the user what upstream changed — do not blindly override.
+- Never force-push to `main` / `master` / `release/*` branches without the user explicitly requesting it.

@@ -1,0 +1,58 @@
+---
+description: Code style preferences for this codebase. Favor minimal, direct code. These are preferences, not hard rules — use judgment when the context calls for a different approach. Use when writing new functions/modules or refactoring existing code.
+---
+
+# Code Style Preferences
+
+These are the coding preferences for this project. Follow them as defaults, but deviate when you have a good reason — they're guidelines, not laws.
+
+## Core principle: write the minimum viable code
+
+Favor the smallest, most direct code that solves the problem. Add abstractions, parameters, and indirection only when a concrete need exists today, not speculatively.
+
+## YAGNI — defer flexibility until needed
+
+- If a value is only ever one thing, hardcode it as a module-level constant rather than accepting it as a parameter.
+- Skip factory functions (`createX()` / `makeX()`) when there's nothing meaningful to inject — just export the value directly.
+- Combine small functions that are only ever called together in sequence into one function.
+- If a function parameter is always the same value in practice, remove the parameter and hardcode it.
+- Extract helpers only when code appears 3+ times, exceeds ~10 lines, or the name genuinely clarifies intent.
+
+## Keep code close and simple
+
+- **Colocation**: keep helpers near their callers. Prefer a local function over `utils/foo-helpers.ts` used by one file.
+- **Module-level constants**: hoist magic numbers and config values to module scope where they're easy to find. Import them directly rather than threading through constructor args.
+- **Shared constants** used across multiple modules or the client/server boundary belong in a single shared constants/config module, not duplicated.
+- **Top-level imports**: prefer static `import` over dynamic `import()` unless there's a real reason (circular deps, conditional platform code, large optional module).
+- **Tests beside source**: `foo.test.ts` next to `foo.ts`, not in a separate `__tests__/` tree.
+
+## Fail loud, surface errors
+
+- Required config should assert at module load and throw if missing. Prefer a single loud failure over scattered `if (value)` guards that silently degrade.
+- Use `assert()` from `node:assert` for programming invariants. Reserve `if/throw` for user-facing errors or custom error classes.
+- Surface errors to the caller. Avoid retry-with-refresh or silent fallbacks unless the upstream explicitly documents transient failures.
+- If `undefined` is a valid state (e.g. no icon available), propagate it rather than falling back to a placeholder.
+
+## Readability preferences
+
+- **Descriptive names**: `botToken` over `s`, `message` over `m`. Single letters are fine for loop counters (`i`, `j`) and trivially obvious one-line callbacks (`n => n * 2`).
+- **Destructure in signatures**: `function connect({ service, scopes }: Payload)` instead of accepting an opaque `params` and destructuring on line 1.
+- **Export functions, not method-bag objects**: when a module has no instance state, export the functions directly rather than grouping them into a `const client = { foo, bar }` object.
+- **Typed fields over string parsing**: if `integration.provider` exists, use it instead of `integrationId.split('_')[0]`.
+- **Discriminated unions**: model variant types with a literal discriminant field rather than a single interface with optional fields per variant.
+- **For-loops for retries**: retry logic reads more clearly as a for-loop with `continue`/`break` than as recursion.
+- **Simple constructs**: use a for-loop with `push` when it reads better than `flatMap`. Mutate when you own the object.
+
+## LLM-consumed APIs
+
+When an API surface is consumed by an LLM (tool schemas, message payloads), name fields so the model can infer meaning without context. Prefer `messageId` and `threadId` over `ts` and `thread_ts`. Prefer `joinChannel` over `autoJoinChannel`.
+
+## Code hygiene
+
+- **Remove dead code** in the same change that made it unnecessary — git preserves history.
+- **Search before writing**: check for existing helpers, wrappers, and constants before creating new ones. Adjust an existing function rather than writing a parallel one.
+- **Fix the consumer, not the data shape**: when an API returns a new shape, update consumers to use it directly instead of adding a translation layer.
+- **Server-side filtering**: if every client filters the same way, move that logic to the server.
+- **Push boilerplate to the boundary**: repeated try/catch, logging, or error-mapping across handlers belongs in middleware, not per-handler.
+- **Add new functions for new behavior**: when adding a variant (e.g. "logout and switch account"), create a new function alongside the existing one rather than adding a boolean flag parameter.
+- **Official brand assets**: use vendor logos from brand/media kits, not generic icon libraries.

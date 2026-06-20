@@ -23,7 +23,7 @@ interface MiniMapProps {
 }
 
 const USER_ICON = L.divIcon({
-  html: '<div style="width:12px;height:12px;background:#3b82f6;border:2px solid white;border-radius:50%;box-shadow:0 0 6px rgba(59,130,246,0.6)"></div>',
+  html: '<div style="width:12px;height:12px;background:#3B6FB0;border:2px solid white;border-radius:50%;box-shadow:0 0 6px rgba(59,111,176,0.6)"></div>',
   iconSize: [12, 12],
   iconAnchor: [6, 6],
   className: "",
@@ -67,7 +67,7 @@ export default function MiniMap({ center, markers, height = "180px" }: MiniMapPr
     const bounds = L.latLngBounds([[center.lat, center.lng]]);
 
     markers.forEach((m) => {
-      const icon = makeRankIcon(m.rank ?? 1, "#14b8a6");
+      const icon = makeRankIcon(m.rank ?? 1, "#1C6B66");
       const marker = L.marker([m.lat, m.lng], { icon }).addTo(map);
       marker.on("click", () => {
         setSelected(m);
@@ -150,7 +150,7 @@ export default function MiniMap({ center, markers, height = "180px" }: MiniMapPr
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="shrink-0 w-7 h-7 rounded-full bg-brand-teal/20 text-brand-teal text-xs font-bold flex items-center justify-center">
+                    <span className="shrink-0 w-7 h-7 rounded-full bg-caregiver/25 text-caregiver-soft text-xs font-bold flex items-center justify-center">
                       {selected.rank ?? "•"}
                     </span>
                     <span className="text-base font-semibold text-white">{selected.label}</span>
@@ -199,7 +199,7 @@ export default function MiniMap({ center, markers, height = "180px" }: MiniMapPr
 
                 {/* Action buttons */}
                 <div className="flex gap-2 mt-4 pl-9">
-                  <span className="text-[11px] px-3 py-1.5 rounded-full border border-brand-teal/30 text-brand-teal">
+                  <span className="text-[11px] px-3 py-1.5 rounded-full border border-caregiver/40 text-caregiver-soft">
                     Get directions
                   </span>
                   <span className="text-[11px] px-3 py-1.5 rounded-full border border-white/20 text-white/60">

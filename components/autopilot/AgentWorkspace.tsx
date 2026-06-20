@@ -7,51 +7,66 @@ import AICFeed from "./AICFeed";
 import NursingFeed from "./NursingFeed";
 import ICCPFeed from "./ICCPFeed";
 import MedicationFeed from "./MedicationFeed";
+import type { PillStatus } from "@/components/ui/StatusPill";
 
 type PanelId = "iccp" | "nursing" | "aic" | "medication" | "telegram";
 
-const PANELS: { id: PanelId; title: string; subtitle: string }[] = [
-  { id: "iccp", title: "ICCP Coordinator", subtitle: "Case handover" },
+interface PanelDef {
+  id: PanelId;
+  title: string;
+  subtitle: string;
+  bypassGate?: boolean; // ICCP escalates to a human faster — it may skip the gate.
+  liveLabel?: string;   // LIVE chip only on genuinely-live actions (real Telegram send).
+}
+
+const PANELS: PanelDef[] = [
+  { id: "iccp", title: "ICCP Coordinator", subtitle: "Case handover", bypassGate: true },
   { id: "nursing", title: "HomeNursing.sg", subtitle: "Provider booking" },
   { id: "aic", title: "AIC", subtitle: "Eldercare services" },
   { id: "medication", title: "Medication Review", subtitle: "HSA + openFDA" },
-  { id: "telegram", title: "Telegram", subtitle: "Caregiver alert" },
+  { id: "telegram", title: "Telegram", subtitle: "Caregiver alert", liveLabel: "Caregiver alert" },
 ];
 
-export default function AgentWorkspace() {
+export default function AgentWorkspace({ approved }: { approved: boolean }) {
   const [expanded, setExpanded] = useState<PanelId | null>(null);
 
   const toggle = (id: PanelId) => setExpanded((cur) => (cur === id ? null : id));
 
   return (
-    <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-9rem)]">
-      {PANELS.map((panel) => (
-        <WorkspacePanel
-          key={panel.id}
-          title={panel.title}
-          subtitle={panel.subtitle}
-          isExpanded={expanded === panel.id}
-          isAnyExpanded={expanded !== null}
-          onToggleExpand={() => toggle(panel.id)}
-        >
-          {renderContent(panel.id)}
-        </WorkspacePanel>
-      ))}
+    <div className="flex flex-col lg:flex-row gap-3 h-full">
+      {PANELS.map((panel) => {
+        const enabled = approved || !!panel.bypassGate;
+        const status: PillStatus = enabled ? "running" : "draft";
+        return (
+          <WorkspacePanel
+            key={panel.id}
+            title={panel.title}
+            subtitle={panel.subtitle}
+            status={status}
+            liveLabel={enabled ? panel.liveLabel : undefined}
+            isExpanded={expanded === panel.id}
+            isAnyExpanded={expanded !== null}
+            onToggleExpand={() => toggle(panel.id)}
+          >
+            {renderContent(panel.id, enabled)}
+          </WorkspacePanel>
+        );
+      })}
     </div>
   );
 }
 
-function renderContent(id: PanelId) {
+function renderContent(id: PanelId, enabled: boolean) {
   switch (id) {
     case "iccp":
-      return <ICCPFeed />;
+      return <ICCPFeed enabled={enabled} />;
     case "nursing":
-      return <NursingFeed />;
+      return <NursingFeed enabled={enabled} />;
     case "aic":
-      return <AICFeed />;
+      return <AICFeed enabled={enabled} />;
     case "medication":
-      return <MedicationFeed />;
+      return <MedicationFeed enabled={enabled} />;
     case "telegram":
-      return <TelegramFeed />;
+      return <TelegramFeed enabled={enabled} />;
   }
 }

@@ -156,7 +156,16 @@ export function useAudioGuide() {
         speechRecognitionWindow.SpeechRecognition ||
         speechRecognitionWindow.webkitSpeechRecognition;
 
-      if (!SpeechRecognition) return;
+      // Flip the button immediately so every click produces a visible response.
+      // If SR is unavailable or permission is denied, error handlers reset it back.
+      setState((s) => ({ ...s, micOn: true, micError: null, status: "listening" }));
+
+      if (!SpeechRecognition) {
+        // Browser doesn't support the API — show an error but stay in "on" state
+        // long enough for the user to see feedback, then reset.
+        setState((s) => ({ ...s, micOn: false, micError: "unsupported" }));
+        return;
+      }
 
       const recognition = new SpeechRecognition();
       recognition.lang = "en-SG";
@@ -168,8 +177,6 @@ export function useAudioGuide() {
         onResult(transcript);
       };
 
-      // Without an onerror handler, a permission denial fires onerror then onend
-      // immediately, silently resetting micOn → false so the button looks stuck.
       recognition.onerror = (e: SpeechRecognitionErrorEventLike) => {
         recognitionRef.current = null;
         const isDenied =
@@ -204,9 +211,7 @@ export function useAudioGuide() {
           micError: "unsupported",
           status: s.enabled ? "idle" : "off",
         }));
-        return;
       }
-      setState((s) => ({ ...s, micOn: true, micError: null, status: "listening" }));
     },
     [state.status]
   );

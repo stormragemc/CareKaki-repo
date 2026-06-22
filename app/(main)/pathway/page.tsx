@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { History } from "lucide-react";
 import PathwayBoard from "@/components/pathway/PathwayBoard";
 import { getPathwayPlan, modeForPersona } from "@/components/pathway/pathwayData";
 import ModeChip from "@/components/ui/ModeChip";
+import FlowStepper from "@/components/ui/FlowStepper";
 import type { CareMode, CareProfile, PathwayItem } from "@/lib/types";
+import type { PhaseRecord } from "@/lib/care-cycle";
 import type { DemoUser } from "@/lib/demo-users";
 
 // Session values are read-once and never mutate during a visit, so the
@@ -48,15 +51,31 @@ export default function PathwayPage() {
   // The real fork is the selected persona (spec §1), not the cosmetic ?mode=
   // label. Onboard users (no demo user) fall back to caregiver.
   let mode: CareMode = "caregiver";
+  let personaId: string | undefined;
   if (userRaw) {
     try {
-      mode = modeForPersona((JSON.parse(userRaw) as DemoUser).id) ?? "caregiver";
+      personaId = (JSON.parse(userRaw) as DemoUser).id;
+      mode = modeForPersona(personaId) ?? "caregiver";
     } catch {
       /* keep default */
     }
   }
 
-  const baseItems = getPathwayPlan(mode);
+  // Care cycle — which phase this plan is, and what carried over from the last one.
+  const phaseRaw = useSessionItem("carePhase");
+  const historyRaw = useSessionItem("carePhaseHistory");
+  const phase = phaseRaw ? parseInt(phaseRaw, 10) || 1 : 1;
+  let lastPhase: PhaseRecord | null = null;
+  if (historyRaw) {
+    try {
+      const history = JSON.parse(historyRaw) as PhaseRecord[];
+      lastPhase = history.length ? history[history.length - 1] : null;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const baseItems = getPathwayPlan(mode, personaId);
   // Edits overlay the persona base; null = untouched (keeps SSR/hydration clean).
   const [editedItems, setEditedItems] = useState<PathwayItem[] | null>(null);
   const items = editedItems ?? baseItems;
@@ -109,13 +128,19 @@ export default function PathwayPage() {
 
   return (
     <div className="flex flex-col">
+      <FlowStepper />
       <div className="mx-auto flex w-full max-w-7xl gap-6 px-6 py-10">
         {/* Main column */}
         <div className="flex min-w-0 flex-1 flex-col gap-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink-muted">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-ink-muted">
                 The Pathway
+                {phase > 1 && (
+                  <span className="rounded-full bg-self-soft px-2 py-0.5 text-self-ink">
+                    Phase {phase}
+                  </span>
+                )}
               </p>
               <h1 className="font-serif text-3xl font-semibold leading-tight text-ink sm:text-4xl">
                 {title}
@@ -136,6 +161,22 @@ export default function PathwayPage() {
               </button>
             </div>
           </div>
+
+          {phase > 1 && lastPhase && (
+            <div className="flex items-start gap-3 rounded-2xl border border-caregiver-border bg-caregiver-soft px-5 py-4">
+              <History size={20} className="mt-0.5 shrink-0 text-caregiver" aria-hidden="true" />
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-semibold text-caregiver-ink">
+                  Carried forward from Phase {lastPhase.phase}
+                </p>
+                <p className="text-sm leading-relaxed text-ink-body">{lastPhase.summary}</p>
+                <p className="text-xs text-ink-muted">
+                  Vital details — the care profile, consents on file, and family contacts —
+                  stay in place. This plan adds the next steps on top.
+                </p>
+              </div>
+            </div>
+          )}
 
           <PathwayBoard items={items} />
         </div>

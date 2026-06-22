@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import WorkspacePanel from "./WorkspacePanel";
 import TelegramFeed from "./TelegramFeed";
 import AICFeed from "./AICFeed";
@@ -15,16 +15,20 @@ interface PanelDef {
   id: PanelId;
   title: string;
   subtitle: string;
-  sources: string[];     // provenance — surfaced in the panel header as an honesty cue
-  bypassGate?: boolean;  // ICCP escalates to a human faster — it may skip the gate.
-  liveLabel?: string;    // LIVE chip only on genuinely-live actions (real Telegram send).
+  sources: string[];        // provenance — surfaced in the panel header as an honesty cue
+  bypassGate?: boolean;     // ICCP escalates to a human faster — it may skip the gate.
+  liveLabel?: string;       // LIVE chip only on genuinely-live actions (real Telegram send).
+  enabledStatus?: PillStatus; // overrides the default "running" pill once enabled
+  statusLabel?: string;     // custom pill text (e.g. a flag rather than a live action)
 }
 
 const ALL_PANELS: PanelDef[] = [
   { id: "iccp", title: "ICCP Coordinator", subtitle: "Case handover", sources: ["Telegram Bot API"], bypassGate: true },
   { id: "nursing", title: "HomeNursing.sg", subtitle: "Provider booking", sources: ["CHAS GeoJSON"] },
   { id: "aic", title: "AIC", subtitle: "Eldercare services", sources: ["Eldercare GeoJSON"] },
-  { id: "medication", title: "Medication Review", subtitle: "HSA + openFDA", sources: ["HSA CSV", "openFDA API"] },
+  // CareKaki does NOT assess medication itself — it raises a flag for a clinician
+  // and routes it to the care team. No autonomous interaction check runs here.
+  { id: "medication", title: "Medication", subtitle: "Routed to clinician", sources: ["Care Corner clinician"], enabledStatus: "done", statusLabel: "Flagged for clinician" },
   { id: "telegram", title: "Telegram", subtitle: "Caregiver alert", sources: ["Telegram Bot API"], liveLabel: "Caregiver alert" },
 ];
 
@@ -45,9 +49,17 @@ export function resolveActivePanelIds(): PanelId[] {
   return ALL_PANEL_IDS;
 }
 
-export default function AgentWorkspace({ approved }: { approved: boolean }) {
+export default function AgentWorkspace({
+  approved,
+  onAllPanelsViewed,
+}: {
+  approved: boolean;
+  onAllPanelsViewed?: () => void;
+}) {
   const [expanded, setExpanded] = useState<PanelId | null>(null);
   const [activeIds, setActiveIds] = useState<PanelId[]>(ALL_PANEL_IDS);
+  const viewedRef = useRef<Set<PanelId>>(new Set());
+  const firedRef = useRef(false);
 
   useEffect(() => {
     // sessionStorage is client-only; resolve after mount to keep SSR/hydration in sync.
@@ -56,7 +68,21 @@ export default function AgentWorkspace({ approved }: { approved: boolean }) {
   }, []);
 
   const panels = ALL_PANELS.filter((p) => activeIds.includes(p.id));
-  const toggle = (id: PanelId) => setExpanded((cur) => (cur === id ? null : id));
+
+  const toggle = (id: PanelId) => {
+    setExpanded((cur) => (cur === id ? null : id));
+    // Once the caregiver has opened every running panel at least once, the
+    // "you've seen everything — head to the Care Brief" nudge can fire.
+    viewedRef.current.add(id);
+    if (
+      !firedRef.current &&
+      panels.length > 0 &&
+      panels.every((p) => viewedRef.current.has(p.id))
+    ) {
+      firedRef.current = true;
+      onAllPanelsViewed?.();
+    }
+  };
 
   if (panels.length === 0) return null;
 
@@ -64,13 +90,14 @@ export default function AgentWorkspace({ approved }: { approved: boolean }) {
     <div className="flex flex-col lg:flex-row gap-3 h-full">
       {panels.map((panel) => {
         const enabled = approved || !!panel.bypassGate;
-        const status: PillStatus = enabled ? "running" : "draft";
+        const status: PillStatus = enabled ? panel.enabledStatus ?? "running" : "draft";
         return (
           <WorkspacePanel
             key={panel.id}
             title={panel.title}
             subtitle={panel.subtitle}
             status={status}
+            statusLabel={panel.statusLabel}
             liveLabel={enabled ? panel.liveLabel : undefined}
             sources={panel.sources}
             isExpanded={expanded === panel.id}

@@ -1,113 +1,64 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ShieldAlert, ArrowUpRight, UserCog } from "lucide-react";
 import { DraftNotice } from "./WorkspaceLog";
 
-interface MedLogEntry {
-  from: "system" | "bot" | "user";
-  text: string;
-  tone: "default" | "success" | "pending";
-  time: string;
-}
-
-const toneDot: Record<string, string> = {
-  default: "bg-autopilot-muted",
-  success: "bg-status-done-dark",
-  pending: "bg-status-running-dark animate-pulse",
-};
-
-const fromLabel: Record<string, string> = {
-  system: "CareKaki",
-  bot: "Bot",
-  user: "Pharmacy",
-};
-
-const fromColor: Record<string, string> = {
-  system: "text-live-dark",
-  bot: "text-weeks-soft",
-  user: "text-status-done-dark",
-};
-
+// CareKaki does NOT assess medication itself. For a high-acuity, unsupported
+// case (e.g. anticoagulants + a recent blackout) the safe behaviour is to raise
+// a flag and route it to a clinician via the coordinator — never an autonomous
+// interaction check. So this panel makes no network call; it surfaces the flag.
 export default function MedicationFeed({ enabled = true }: { enabled?: boolean }) {
-  const [log, setLog] = useState<MedLogEntry[]>([]);
-  const [triggered, setTriggered] = useState(false);
+  const [meds, setMeds] = useState<string>("");
 
   useEffect(() => {
-    if (!enabled || triggered) return; // held behind the approval gate
+    try {
+      const profileStr = sessionStorage.getItem("careProfile");
+      if (profileStr) {
+        const p = JSON.parse(profileStr);
+        if (typeof p.conditions === "string") setMeds(p.conditions);
+      }
+    } catch {}
+  }, []);
 
-    const trigger = async () => {
-      setTriggered(true);
-      await new Promise((r) => setTimeout(r, 3000));
-      try {
-        let seniorName = "Senior";
-        let age = 75;
-        let rawMessage = "Senior feels unwell after taking medication";
-        try {
-          const profileStr = sessionStorage.getItem("careProfile");
-          if (profileStr) {
-            const p = JSON.parse(profileStr);
-            seniorName = p.name || seniorName;
-            age = p.age || age;
-            rawMessage = `${seniorName} ${p.conditions || "needs medication review"}`;
-          }
-        } catch {}
-
-        await fetch("http://localhost:8000/integrations/medication-review/request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            senior_name: seniorName,
-            age,
-            symptom: sessionStorage.getItem("autopilotTrigger") || "medication concern",
-            context: "caregiver is worried about medication side effects",
-            raw_message: rawMessage,
-          }),
-        });
-      } catch {}
-    };
-    trigger();
-  }, [enabled, triggered]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const fetchLog = () => {
-      fetch("http://localhost:8000/medication/log")
-        .then((res) => res.json())
-        .then((data) => setLog(data.log ?? []))
-        .catch(() => {});
-    };
-    fetchLog();
-    const interval = setInterval(fetchLog, 1500);
-    return () => clearInterval(interval);
-  }, [enabled]);
-
-  if (!enabled) return <DraftNotice label="Drafted — medication review awaiting approval" />;
-
-  if (log.length === 0) {
-    return (
-      <div className="flex items-center gap-2 px-2 py-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-status-running-dark animate-pulse" />
-        <span className="text-xs text-autopilot-muted">Scanning for medication concerns…</span>
-      </div>
-    );
-  }
+  if (!enabled) return <DraftNotice label="Drafted — medication flag awaiting approval" />;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {log.map((entry, i) => (
-        <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-autopilot-band">
-          <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${toneDot[entry.tone]}`} />
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className={`text-[10px] font-semibold ${fromColor[entry.from]}`}>
-                {fromLabel[entry.from] ?? entry.from}
-              </span>
-              <span className="text-[10px] text-autopilot-muted">{entry.time}</span>
-            </div>
-            <span className="text-xs text-autopilot-text leading-snug">{entry.text}</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-2.5 rounded-xl border border-status-running-dark/50 bg-autopilot-band p-3">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-status-running-dark/20 text-status-running-dark">
+          <ShieldAlert size={15} aria-hidden="true" />
+        </span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-xs font-semibold text-autopilot-text">
+            Flagged for clinician-led review
+          </p>
+          <p className="text-[11px] leading-snug text-autopilot-muted">
+            CareKaki won&apos;t assess these medications itself. The list has been routed to
+            the care team for an urgent clinician-led medication &amp; falls review.
+          </p>
+        </div>
+      </div>
+
+      {meds && (
+        <div className="flex items-start gap-2 rounded-lg bg-autopilot-band px-2.5 py-2">
+          <UserCog size={13} className="mt-0.5 shrink-0 text-autopilot-muted" aria-hidden="true" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-autopilot-muted">
+              Shared with clinician — not interpreted
+            </span>
+            <span className="text-xs leading-snug text-autopilot-text">{meds}</span>
           </div>
         </div>
-      ))}
+      )}
+
+      <div className="flex items-start gap-2 rounded-lg bg-autopilot-band px-2.5 py-2">
+        <ArrowUpRight size={13} className="mt-0.5 shrink-0 text-status-done-dark" aria-hidden="true" />
+        <span className="text-xs leading-snug text-autopilot-text">
+          Routed to the ICCP coordinator alongside the urgent escalation — a clinician
+          decides on interactions and falls risk.
+        </span>
+      </div>
     </div>
   );
 }

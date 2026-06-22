@@ -7,6 +7,7 @@ interface WorkspacePanelProps {
   title: string;
   subtitle: string;
   status?: PillStatus;
+  statusLabel?: string;
   liveLabel?: string;
   sources?: string[];
   isExpanded: boolean;
@@ -19,6 +20,7 @@ export default function WorkspacePanel({
   title,
   subtitle,
   status,
+  statusLabel,
   liveLabel,
   sources,
   isExpanded,
@@ -56,7 +58,7 @@ export default function WorkspacePanel({
                 </span>
               )}
               {liveLabel && <LiveChip label={liveLabel} theme="dark" />}
-              {status && <StatusPill status={status} theme="dark" />}
+              {status && <StatusPill status={status} theme="dark" label={statusLabel} />}
             </>
           ) : (
             // Collapsed: one status signal only, so the title stays readable.
@@ -65,7 +67,7 @@ export default function WorkspacePanel({
               {liveLabel ? (
                 <LiveChip label={liveLabel} theme="dark" compact />
               ) : (
-                status && <StatusPill status={status} theme="dark" />
+                status && <StatusPill status={status} theme="dark" label={statusLabel} />
               )}
             </>
           )}

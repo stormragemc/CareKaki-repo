@@ -55,7 +55,32 @@ const selfPlan: PathwayItem[] = [
   { id: "aac", group: "single-point", title: "Active Ageing Centre", whyTag: "Loneliness — family overseas", divergence: "elevated" },
 ];
 
-export function getPathwayPlan(mode: CareMode): PathwayItem[] {
+// Uncle Raj is high-acuity and unsupported (recent blackout, heart failure, on
+// anticoagulants, lives alone). The correct posture is to lead with escalation
+// to a human and flag — NOT to autonomously plan or assess his medication. So he
+// gets a dedicated plan rather than inheriting the standard `selfPlan`.
+const escalationPlan: PathwayItem[] = [
+  { id: "alert-device", group: "this-week", title: "Personal alert device", whyTag: "Lives alone after a blackout" },
+  { id: "home-safety", group: "this-week", title: "Home-safety walk-through", whyTag: "Recent fall · 2nd-floor flat, no lift" },
+  { id: "med-flag", group: "this-week", title: "Flag for clinician-led medication review", whyTag: "Multiple cardiac medications — not assessed by CareKaki" },
+
+  { id: "home-nursing", group: "weeks-2-8", title: "Home nursing — once a clinician clears it", whyTag: "Post-A&E monitoring" },
+  { id: "falls-review", group: "weeks-2-8", title: "Falls & mobility review", whyTag: "History of falls · unsteady on a stick" },
+
+  { id: "medifund", group: "apply-now", title: "MediFund top-up", whyTag: "Per-capita income within full-subsidy tier" },
+  { id: "chas", group: "apply-now", title: "CHAS review", whyTag: "Outpatient cardiac follow-ups" },
+
+  { id: "escalate", group: "single-point", title: "Urgent: clinician review + coordinator escalation", whyTag: "Recent blackout · heart failure · on anticoagulants · lives alone", highlight: true },
+  { id: "nephew-loop", group: "single-point", title: "Loop in nephew + coordinator updates", whyTag: "No primary caregiver — nephew visits weekly" },
+];
+
+// Personas whose plan diverges from the plain mode default. Keyed by persona id.
+const personaPlans: Record<string, PathwayItem[]> = {
+  "uncle-raj": escalationPlan,
+};
+
+export function getPathwayPlan(mode: CareMode, personaId?: string): PathwayItem[] {
+  if (personaId && personaPlans[personaId]) return personaPlans[personaId];
   return mode === "self" ? selfPlan : caregiverPlan;
 }
 

@@ -36,6 +36,8 @@ Rules:
 EVENT_PROMPTS: dict[str, str] = {
     "guide_started": "The user just turned on Audio Guide Mode. Welcome them warmly in 1-2 sentences. Tell them you'll talk them through each step.",
 
+    "tutorial_overview": "The user is on the 'How CareKaki works' page before starting. Explain the whole journey in a warm, conversational way, in 4-5 short sentences: first you'll have a friendly chat so CareKaki understands their situation (no forms); then CareKaki builds a simple care plan; then Autopilot does the legwork — booking and contacting services — while always keeping a human reachable; finally they get a Care Brief they can share, and the cycle repeats for the next steps. Reassure them they're never alone and nothing happens without their approval.",
+
     "profiling_question": "You need to ask the elderly person a simple care profiling question. Context: {context}. Ask ONE casual question to understand their situation. Keep it gentle.",
 
     "profile_updated": "The care profile was just updated with new information. Briefly acknowledge it in 1 sentence. Don't repeat the details.",

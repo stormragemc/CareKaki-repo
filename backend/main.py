@@ -935,6 +935,21 @@ class VoiceEventRequest(BaseModel):
     mode: str = "caregiver"
 
 
+# HTTP headers must be latin-1 encodable, but GPT scripts often contain smart
+# quotes / em-dashes (U+2019, U+2014, …). Normalise those to ASCII so the
+# X-Voice-Script header can't 500 the (otherwise valid) audio response.
+_SMART_PUNCT = {
+    "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+    "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u00a0": " ",
+}
+
+
+def _header_safe(text: str, limit: int = 200) -> str:
+    for bad, good in _SMART_PUNCT.items():
+        text = text.replace(bad, good)
+    return text.encode("ascii", "ignore").decode("ascii")[:limit]
+
+
 @app.post("/voice/speak")
 def voice_speak(req: VoiceEventRequest):
     script, audio = generate_voice_audio(req.event, req.context, req.mode)
@@ -942,7 +957,7 @@ def voice_speak(req: VoiceEventRequest):
         return Response(
             content=audio,
             media_type="audio/mpeg",
-            headers={"X-Voice-Script": script[:200]},
+            headers={"X-Voice-Script": _header_safe(script)},
         )
     return {"script": script, "audio": None}
 

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <clipPath id="ck-fav-left"><rect x="0" y="0" width="32" height="64"/></clipPath>
+    <clipPath id="ck-fav-right"><rect x="32" y="0" width="32" height="64"/></clipPath>
+  </defs>
+  <g transform="translate(0 3)">
+    <path clip-path="url(#ck-fav-left)" fill="#7FC4BD" fill-rule="evenodd"
+      d="M32 56 C 13 40 6 31 6 22 C 6 15 11 10 18 10 C 24 10 29 13 32 18 C 35 13 40 10 46 10 C 53 10 58 15 58 22 C 58 31 51 40 32 56 Z M32 47 C 18 35 13 29 13 23 C 13 18.5 16.5 15.5 21 15.5 C 25 15.5 29 18.5 32 23.5 C 35 18.5 39 15.5 43 15.5 C 47.5 15.5 51 18.5 51 23 C 51 29 46 35 32 47 Z"/>
+    <path clip-path="url(#ck-fav-right)" fill="#1C6B66" fill-rule="evenodd"
+      d="M32 56 C 13 40 6 31 6 22 C 6 15 11 10 18 10 C 24 10 29 13 32 18 C 35 13 40 10 46 10 C 53 10 58 15 58 22 C 58 31 51 40 32 56 Z M32 47 C 18 35 13 29 13 23 C 13 18.5 16.5 15.5 21 15.5 C 25 15.5 29 18.5 32 23.5 C 35 18.5 39 15.5 43 15.5 C 47.5 15.5 51 18.5 51 23 C 51 29 46 35 32 47 Z"/>
+    <circle cx="20" cy="6.5" r="5" fill="#7FC4BD"/>
+    <circle cx="44" cy="5" r="5.5" fill="#1C6B66"/>
+  </g>
+</svg>

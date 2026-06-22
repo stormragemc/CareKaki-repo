@@ -68,7 +68,7 @@ function ConsentInner() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-cream px-4 py-10">
-      <div className="w-full max-w-[560px] overflow-hidden rounded-[20px] bg-surface shadow-[0_14px_40px_rgba(44,39,34,0.10)]">
+      <div className="w-full max-w-[560px] overflow-hidden rounded-[20px] bg-surface shadow-[0_14px_40px_rgba(30,42,51,0.10)]">
         {/* Singpass header band */}
         <div className="flex items-center justify-between bg-singpass px-6 py-4 text-white">
           <span className="text-lg font-bold lowercase tracking-tight">singpass</span>
@@ -101,7 +101,7 @@ function ConsentInner() {
           </ul>
 
           {/* Guardian note */}
-          <div className="flex items-start gap-3 rounded-xl bg-[#F7F3EB] px-4 py-3">
+          <div className="flex items-start gap-3 rounded-xl bg-tint px-4 py-3">
             <ShieldCheck size={18} className="mt-0.5 shrink-0 text-live" aria-hidden="true" />
             <p className="text-sm leading-relaxed text-ink-soft">
               Guardian tokenises your NRIC &amp; income on arrival. Data never leaves the

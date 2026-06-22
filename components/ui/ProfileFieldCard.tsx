@@ -1,20 +1,21 @@
 import type { CareMode, FieldSource } from "@/lib/types";
 import ProvenanceMarker from "./ProvenanceMarker";
 
-// "just updated" gets a mode-colored border + pill + a one-shot ckPulse ring.
+// "just updated" is GREEN for both personas (Direction A): green border + pill +
+// a one-shot green ckPulse ring. Green now consistently = verified / working / done.
 const updatedBorder: Record<CareMode, string> = {
-  self: "border-self",
-  caregiver: "border-caregiver",
+  self: "border-updated",
+  caregiver: "border-updated",
 };
 
 const pulseTint: Record<CareMode, string> = {
-  self: "[--ck-pulse:rgba(217,116,46,0.45)]",
-  caregiver: "[--ck-pulse:rgba(28,107,102,0.45)]",
+  self: "[--ck-pulse:rgba(46,125,88,0.45)]",
+  caregiver: "[--ck-pulse:rgba(46,125,88,0.45)]",
 };
 
 const updatedPill: Record<CareMode, string> = {
-  self: "bg-self-soft text-self-ink",
-  caregiver: "bg-caregiver-soft text-caregiver-ink",
+  self: "bg-status-done-bg text-updated",
+  caregiver: "bg-status-done-bg text-updated",
 };
 
 export default function ProfileFieldCard({

@@ -87,43 +87,58 @@ should feel intentional (short crossfade).
 
 Replace the `@theme` block in `app/globals.css` with the set below (Tailwind v4: each `--color-*` generates `bg-*` / `text-*` / `border-*`). Light/dark pairs are flat tokens with a `-dark` suffix; the dark Autopilot subtree uses the `autopilot-*` and `-dark` tokens directly.
 
+> **Direction A (locked).** Palette is now **cool / clinical**. Orange is fully removed from Self mode
+> (→ slate-blue `#3B6CA8`); the dark Autopilot world shifts warm-brown → cool slate-navy `#14202B`;
+> **green** (`#2E7D58`) is reserved consistently for *verified / working / done* (incl. the "just
+> updated" beat, now green for **both** personas). Typography pairs **Newsreader** (serif headlines)
+> with **IBM Plex Sans** (UI/body). Full old→new remap in §3.1; unchanged accents in §3.2.
+
 ```css
 @theme {
   /* neutrals / canvas */
-  --color-cream: #FBF7F1;
-  --color-cream-deep: #F4EEE4;
+  --color-cream: #F6F8FA;
+  --color-cream-deep: #EDF1F5;
   --color-surface: #FFFFFF;
-  --color-ink: #2C2722;
-  --color-ink-body: #3A352E;
-  --color-ink-soft: #6F685E;
-  --color-ink-muted: #8A8074;
-  --color-ink-faint: #9A9184;
-  --color-hairline: #EDE7DC;
-  --color-hairline-warm: #E4DCCE;
+  --color-ink: #1E2A33;
+  --color-ink-body: #2E3A42;
+  --color-ink-soft: #566069;
+  --color-ink-muted: #7C8890;
+  --color-ink-faint: #8A969E;
+  --color-hairline: #E4E9ED;
+  --color-hairline-warm: #D9DFE4;
+  --color-tint: #EEF2F6;
+  --color-divider: #E8ECEF;
+  --color-grab: #D2DAE0;
 
-  /* mode — self (orange) */
-  --color-self: #D9742E;
-  --color-self-ink: #A85518;
-  --color-self-soft: #FBEEE2;
-  --color-self-border: #F0D9C4;
+  /* mode — self (slate-blue; orange fully removed) */
+  --color-self: #3B6CA8;
+  --color-self-ink: #33598E;
+  --color-self-soft: #E9F0F8;
+  --color-self-border: #C9D8EC;
+  --color-self-dark: #244569;
+  --color-provenance-chat: #5E7480;
 
-  /* mode — caregiver (teal) */
+  /* mode — caregiver (teal) — UNCHANGED */
   --color-caregiver: #1C6B66;
   --color-caregiver-ink: #15524E;
   --color-caregiver-soft: #E3F0EE;
   --color-caregiver-border: #C9E0DD;
 
-  /* autopilot dark world */
-  --color-autopilot-bg: #241C16;
-  --color-autopilot-card: #322820;
-  --color-autopilot-card-draft: #2A211B;
-  --color-autopilot-band: #1B1410;
-  --color-autopilot-hairline: #463A30;
-  --color-autopilot-text: #F3E9DC;
-  --color-autopilot-muted: #9A8C7C;
+  /* autopilot dark world (cool slate-navy) */
+  --color-autopilot-bg: #14202B;
+  --color-autopilot-card: #1E2E3A;
+  --color-autopilot-card-draft: #19262F;
+  --color-autopilot-band: #0E1820;
+  --color-autopilot-hairline: #2C3E48;
+  --color-autopilot-dashed: #3A4E58;
+  --color-autopilot-pill: #283842;
+  --color-autopilot-text: #EAF1F5;
+  --color-autopilot-muted: #8598A2;
+  --color-autopilot-muted-2: #94A7B1;
+  --color-autopilot-draft: #AEBFC8;
 
   /* pathway groups */
-  --color-week: #C2841A;        --color-week-soft: #FBEEE2;
+  --color-week: #8A5A14;        --color-week-soft: #F4E9D6;   /* This Week — kept muted amber */
   --color-weeks: #3B6FB0;       --color-weeks-soft: #EAF0F7;
   --color-apply: #3E8E5A;       --color-apply-ink: #2E7D58;  --color-apply-soft: #E7F1EC;
   --color-single: #7C5AA6;      --color-single-soft: #F0EAF6;
@@ -133,38 +148,87 @@ Replace the `@theme` block in `app/globals.css` with the set below (Tailwind v4:
   --color-status-done-bg: #E7F1EC;   --color-status-done-bg-dark: #1F2E22;
   --color-status-running: #C2841A;   --color-status-running-dark: #E0A94A;
   --color-status-running-bg: #FBF0DC;--color-status-running-bg-dark: #3A2E1A;
-  --color-status-draft: #8A7B63;     --color-status-draft-dark: #C9BBA8;
-  --color-status-draft-bg: #EFE7D9;  --color-status-draft-bg-dark: #3A322A;
+  --color-status-draft: #5E7480;     --color-status-draft-dark: #AEBFC8;
+  --color-status-draft-bg: #E2E8EC;  --color-status-draft-bg-dark: #283842;
+  --color-draft-border: #C3D0D8;
 
-  /* live / guardian / singpass */
+  /* "just updated" beat — GREEN for both personas */
+  --color-updated: #2E7D58;
+
+  /* live / guardian / singpass — UNCHANGED */
   --color-live: #2E7D58;       --color-live-dark: #7FE3A6;   --color-live-dot: #4ED98A;
   --color-live-band-dark: #10301F;
   --color-guardian-border: #BFD8C6; --color-guardian-border-dark: #4A6B52;
   --color-singpass: #F4453C;
 
-  /* fonts (unchanged) */
-  --font-serif: var(--font-playfair), Georgia, serif;
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  /* fonts (Direction A) */
+  --font-serif: var(--font-newsreader), Georgia, serif;       /* weights 500/600/700 */
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;  /* weights 400/500/600/700 */
   --font-mono: var(--font-geist-mono), monospace;
 }
 ```
 
-Also update `body { background-color }` to `--color-cream` (`#FBF7F1`) and base text to `--color-ink`. Base body type is **18px minimum** (senior-legible).
+Also update `body { background-color }` to `--color-cream` (`#F6F8FA`) and base text to `--color-ink`
+(`#1E2A33`). Base body type is **18px minimum** (senior-legible).
 
-### Migration map (current `brand-*` → new)
+### 3.1 Direction A remap (old warm → new cool — replace every occurrence)
 
-- `brand-orange` `#E8622C` → `self` `#D9742E`
-- `brand-orange-light` `#FBE8DA` → `self-soft` `#FBEEE2`
+**Neutrals / surfaces:** `#FBF7F1`→`#F6F8FA` (canvas) · `#F4EEE4`→`#EDF1F5` (paper) ·
+`#F7F3EB`→`#EEF2F6` (tint box) · `#FAF4EA`→`#EDF2F6` (autopilot-light draft) ·
+`#EFE7D9`→`#E2E8EC` (progress track / draft pill) · `#D8C4A8`→`#C3D0D8` (dashed draft border) ·
+`#8A7B63`→`#5E7480` (draft text) · `#EDE7DC`→`#E4E9ED` (card hairline) ·
+`#E4DCCE`→`#D9DFE4` (pill/outline border) · `#F1ECE3`→`#E8ECEF` (consent divider) ·
+`#E9E2D6`→`#E4E9ED` (swatch border) · `#E0D8CB`→`#D2DAE0` (mobile grab handle) ·
+`#F2EDE4`→`#EDF1F4` (typing-chip bg) · `#B7AC9A`→`#9CA9B1` (typing dots).
+
+**Text inks:** `#2C2722`→`#1E2A33` (primary) · `#3A352E`→`#2E3A42` (body) · `#6F685E`→`#566069`
+(secondary) · `#8A8074`→`#7C8890` (muted) · `#9A9184`→`#8A969E` (muted 2).
+
+**Self mode (orange → slate-blue):** `#D9742E`→`#3B6CA8` (primary/CTA) · `#A85518`→`#33598E` (text) ·
+`#FBEEE2`→`#E9F0F8` (tint) · `#8A3E12`→`#244569` (cadence dark text) · `#A8714A`→`#5E7480`
+("from chat" label) · self card border `#F0D9C4`→`#C9D8EC` · self glow
+`rgba(217,116,46,.10)`→`rgba(59,108,168,.16)`.
+
+**Autopilot dark (warm brown → cool slate-navy):** `#241C16`→`#14202B` (bg) · `#322820`→`#1E2E3A`
+(service card) · `#2A211B`→`#19262F` (draft card) · `#1B1410`→`#0E1820` (guardian band) ·
+`#463A30`→`#2C3E48` (hairline) · `#5A4A3A`→`#3A4E58` (dashed) · `#3A322A`→`#283842` (draft pill) ·
+`#F3E9DC`→`#EAF1F5` (text) · `#9A8C7C`→`#8598A2` (muted) · `#B7A998`→`#94A7B1` (muted 2) ·
+`#C9BBA8`→`#AEBFC8` (draft text).
+
+**Semantic (not just hue):** "Just updated" beat is now **green** `#2E7D58` for both personas
+(border + pill + pulse). Pathway **This Week** keeps muted amber (pills bg `#F4E9D6`, text `#8A5A14`).
+Consent **self-mode** check badges → slate (bg `#E9F0F8`, check `#33598E`).
+
+### 3.2 Deliberately UNCHANGED
+
+Caregiver teal `#1C6B66`/`#E3F0EE`/`#15524E`; success green `#2E7D58`/`#E7F1EC`; pathway accents
+Weeks 2–8 `#3B6FB0`/`#EAF0F7`, Apply Now `#3E8E5A`, Single Point `#7C5AA6`/`#F0EAF6`; amber status
+`#C2841A`/`#E0A94A`; dark done `#6FCF97`/`#1F2E22`; LIVE green `#4ED98A`/`#7FE3A6`; Guardian greens
+`#4A6B52`/`#BFD8C6`; Singpass red `#F4453C`.
+
+> ⚠️ Self-mode blue `#3B6CA8` sits close to Weeks 2–8 blue `#3B6FB0`; different contexts so it reads OK.
+
+### Migration map (legacy `brand-*` → new, Direction A)
+
+- `brand-orange` `#E8622C` → `self` `#3B6CA8` (slate-blue)
+- `brand-orange-light` `#FBE8DA` → `self-soft` `#E9F0F8`
 - `brand-teal` `#2D5F4E` → `caregiver` `#1C6B66`
 - `brand-teal-light` `#D6EBE0` → `caregiver-soft` `#E3F0EE`
-- `brand-brown` `#2C1510` → `autopilot-bg` `#241C16`
-- `brand-cream` `#F5EDE0` → `cream` `#FBF7F1`
-- `brand-cream-border` `#E8DDD0` → `hairline` `#EDE7DC` / `hairline-warm` `#E4DCCE`
-- `brand-amber` `#C4952B` → `week` `#C2841A`
+- `brand-brown` `#2C1510` → `autopilot-bg` `#14202B` (slate-navy)
+- `brand-cream` `#F5EDE0` → `cream` `#F6F8FA`
+- `brand-cream-border` `#E8DDD0` → `hairline` `#E4E9ED` / `hairline-warm` `#D9DFE4`
+- `brand-amber` `#C4952B` → `week` `#8A5A14` (muted amber retained for This Week)
 - `brand-blue` `#2B5DA6` → `weeks` `#3B6FB0`
-- `brand-pink` `#A0445A` → (no longer used — medication left Autopilot; Apply Now is green `apply`, Single Point is plum `single`)
+- `brand-pink` `#A0445A` → (no longer used — Apply Now is green `apply`, Single Point is plum `single`)
 
-Also remove hardcoded hex in components (`#EDE4D4` chat bubbles, `#3A1E10` service card) in favor of tokens.
+Also remove warm hardcoded hex in components (chat bubbles, `#F7F3EB` tint boxes, ink-based shadow
+`rgba(44,39,34,…)`→`rgba(30,42,51,…)`) in favor of tokens.
+
+### Typography (Direction A)
+
+- **Headlines:** ~~Playfair Display~~ → **Newsreader** (serif, weights 500/600/700) — `--font-serif`.
+- **Body / UI:** ~~Geist~~ → **IBM Plex Sans** (weights 400/500/600/700) — `--font-sans`.
+- Load both via `next/font/google` in `app/layout.tsx` (`--font-newsreader`, `--font-plex-sans`).
 
 ---
 
@@ -259,14 +323,14 @@ Bespoke Tailwind components (no UI lib). Suggested contracts:
 - `ModeChip({ mode })` — "Caregiver"/"Self" pill, mode-tinted.
 - `TalkToHuman()` — outline pill, in every screen header.
 - `WhyTag({ children, group?, mode? })` — `✦`-prefixed pill, group/mode-tinted.
-- `ProvenanceMarker({ source })` — `✓ MyInfo` green pill (`myinfo`) or small orange "from chat" label.
+- `ProvenanceMarker({ source })` — `✓ MyInfo` green pill (`myinfo`) or small slate "from chat" label (`text-provenance-chat`, `#5E7480`).
 - `StatusPill({ status, theme })` — `done | running | draft`; `theme: "light" | "dark"`; running has a leading dot; carries a text label (no color-only).
 - `LiveChip({ label, theme })` — bordered green "LIVE · …" chip. WhatsApp/Calendar only.
 - `GuardianBand({ theme, count })` — full-width inset band; check badge + "Guardian — active" + "No medical advice · PDPA scrubbed · Human one click away" + "Wrapping all {count}". Wrapper, never a tile.
 - `PrimaryButton({ mode, children })` — 50–56px, mode-color fill.
 - `ModeCard({ mode })` — Landing self/caregiver card (reshape existing).
 - `ConsentRow({ field, mode })` — check badge + label + optional masked value/subcopy.
-- `ProfileFieldCard({ field, mode })` — label + provenance marker + value; `justUpdated` applies mode-color border + "just updated" pill + `ckPulse` ring.
+- `ProfileFieldCard({ field, mode })` — label + provenance marker + value; `justUpdated` applies a **green** (`border-updated`) border + green "just updated" pill + green `ckPulse` ring (same for both personas).
 - `PathwayColumn({ group, items, mode })` + `PathwayItemCard({ item, mode })`.
 
 Autopilot uses the existing `WorkspacePanel` + `*Feed` components (recolored to the `autopilot-*`
@@ -294,7 +358,8 @@ rather than duplicating; consolidate the duplicated color maps into one token-dr
 - **Profile "just updated":** on each user message, the simulated reply patches one field → set `justUpdated=true` → `ckPulse` (~1.8s) → clear. MyInfo fields are verified at consent and never editable-from-chat.
 - **Draft/approve gate (over `AgentWorkspace`):** on entry, the feeds are held in a "draft — awaiting approval" state (don't auto-fire their `POST`/poll effects yet). "Approve all" (or per-panel Approve) releases them; each panel then runs its existing live flow. Only ICCP may bypass the gate (escalate-to-human faster). Implement as a gate flag the feeds check before kicking off their effects — minimal change to each feed.
 - **Cream → dark:** short crossfade entering `/autopilot`.
-- **`ckPulse` keyframes** (mode-colored): teal `rgba(28,107,102,…)` caregiver / orange `rgba(217,116,46,…)` self — keep in `globals.css`.
+- **`ckPulse` keyframes are now GREEN for both personas** (no longer mode-colored): `rgba(46,125,88,…)`.
+  Green = verified / working / done. Keep in `globals.css`. See §10 for the full motion system.
 
 ---
 
@@ -323,7 +388,7 @@ The teammate merge changed the app substantially vs. the original design assumpt
 
 **Phase 0 — Foundation**
 - `package.json` — add `lucide-react`.
-- `app/globals.css` — replace `@theme` with §3 tokens; update `body` bg→`cream`/text→`ink`; keep/extend `ckPulse` (mode-colored) + add a short crossfade utility.
+- `app/globals.css` — replace `@theme` with §3 tokens; update `body` bg→`cream`/text→`ink`; `ckPulse` is now **green** for both personas + add `ckDot`/`ckBreathe`/`ckShine`/`ckGuard` (§10) + a short crossfade utility.
 - `lib/types.ts` — **add** `FieldSource`, `ProfileFieldMeta`, `ProfileMeta`, `ConsentField`, `PathwayGroup`, `Divergence` (extend; don't break `CareProfile`/`PathwayColumnData`).
 - `components/ui/` — **new** shared kit: `ModeChip`, `TalkToHuman`, `WhyTag`, `ProvenanceMarker`, `StatusPill`, `LiveChip`, `GuardianBand`, `PrimaryButton`, `ConsentRow`, `ProfileFieldCard` (see §5 contracts).
 
@@ -370,6 +435,40 @@ The teammate merge changed the app substantially vs. the original design assumpt
 - **Backend for the new bits:** Singpass/MyInfo sandbox behind Consent; a Care Brief endpoint; genuinely-live WhatsApp/Calendar `LIVE` proof.
 - **`autopilotAdapters` wiring:** make `AgentWorkspace` show/hide panels per the selected persona's `adapters` (currently stored but unused).
 - **Genuine mode fork** beyond demo-user selection (seeding/tone/notify by `?mode=`).
+
+---
+
+## 10. Motion system (Direction A)
+
+### Keyframes (in `globals.css`, under `@theme` → `animate-*` utilities)
+
+```css
+@keyframes ckPulse  { 0%{box-shadow:0 0 0 0 rgba(46,125,88,.38)} 70%{box-shadow:0 0 0 10px rgba(46,125,88,0)} 100%{box-shadow:0 0 0 0 rgba(46,125,88,0)} }
+@keyframes ckDot    { 0%,80%,100%{transform:translateY(0);opacity:.45} 40%{transform:translateY(-5px);opacity:1} }
+@keyframes ckBreathe{ 0%,100%{opacity:.4;transform:scale(.78)} 50%{opacity:1;transform:scale(1)} }
+@keyframes ckShine  { 0%{transform:translateX(-130%)} 100%{transform:translateX(340%)} }
+@keyframes ckGuard  { 0%,100%{box-shadow:0 0 0 0 rgba(111,207,151,0)} 50%{box-shadow:0 0 0 7px rgba(111,207,151,.16)} }
+```
+
+### Ambient (always-on loops)
+
+- Conversation typing-indicator dots → `ckDot` with `0 / .18s / .36s` stagger across the 3 dots.
+- Running status dots ("Filing…/Routing…/Enrolling…") + green LIVE dots → `ckBreathe`.
+- Autopilot progress-bar fills → moving shine overlay (`ckShine` on a `::after` gradient strip, parent `overflow:hidden`).
+- Guardian shield check badge → soft green halo `ckGuard`.
+- The "just updated" profile field → green `ckPulse` (in-app plays once ~1.8s then clears).
+
+### Hover
+
+- Landing mode cards: `translateY(-4px)` + shadow `0 16px 38px rgba(30,42,51,.15)`, `.18s`, `cursor:pointer`.
+- Pathway items + Autopilot service cards: `translateY(-2px)` + shadow `0 10px 24px rgba(30,42,51,.12)` + `brightness(1.03)`, `.16s`.
+- Filled CTAs (Start / Approve / Launch Autopilot / Approve all / Edit): `brightness(1.07)` + glow `0 8px 20px rgba(14,110,120,.22)`; active `scale(.97)`.
+- "Talk to a human" pills: bg → `#EAF1F2`, text/border → `#0E6E78` / `#BCD7D6`.
+
+### On-demand "▶ Play" sequences (two hero screens)
+
+- **Conversation:** profile fields fade-up in sequence (each `opacity 0→1` + `translateY(14px)→0`, `.5s`, staggered ~280ms), ending on the green just-updated pulse.
+- **Autopilot:** service cards settle in (staggered ~220ms) and progress bars animate `width 0%→target` (`1.1s cubic-bezier(.4,0,.2,1)`).
 
 ---
 

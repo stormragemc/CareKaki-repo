@@ -16,7 +16,7 @@ const config = {
     iconBg: "bg-self-soft",
     iconColor: "text-self",
     cta: "bg-self hover:bg-self-ink",
-    shadow: "shadow-[0_10px_28px_rgba(217,116,46,0.10)]",
+    shadow: "shadow-[0_10px_28px_rgba(59,108,168,0.16)]",
     ctaLabel: "Start for myself",
   },
   caregiver: {
@@ -36,7 +36,7 @@ export default function ModeCard({ mode, title, description, href }: ModeCardPro
 
   return (
     <div
-      className={`flex flex-col gap-5 rounded-[20px] border-2 bg-surface p-8 ${c.border} ${c.shadow}`}
+      className={`flex flex-col gap-5 rounded-[20px] border-2 bg-surface p-8 cursor-pointer transition-all duration-[180ms] hover:-translate-y-1 hover:shadow-[0_16px_38px_rgba(30,42,51,0.15)] ${c.border} ${c.shadow}`}
     >
       <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${c.iconBg}`}>
         <Icon size={28} className={c.iconColor} aria-hidden="true" />

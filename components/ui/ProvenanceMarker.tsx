@@ -13,6 +13,6 @@ export default function ProvenanceMarker({ source }: { source: FieldSource }) {
   }
 
   return (
-    <span className="text-xs font-medium text-self-ink">from chat</span>
+    <span className="text-xs font-medium text-provenance-chat">from chat</span>
   );
 }

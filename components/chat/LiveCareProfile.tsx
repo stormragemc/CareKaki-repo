@@ -76,7 +76,7 @@ export default function LiveCareProfile({ profile, profileMeta, mode }: LiveCare
       <div className="md:hidden">
         <div
           className={[
-            "fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl border-t border-hairline bg-cream shadow-[0_-8px_24px_rgba(44,39,34,0.10)] transition-[max-height] duration-300",
+            "fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl border-t border-hairline bg-cream shadow-[0_-8px_24px_rgba(30,42,51,0.10)] transition-[max-height] duration-300",
             sheetOpen ? "max-h-[70vh]" : "max-h-16",
           ].join(" ")}
         >

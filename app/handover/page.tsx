@@ -96,7 +96,7 @@ export default function HandoverPage() {
 
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 pb-12">
         {/* Warm paper document */}
-        <article className="bg-surface rounded-[14px] shadow-[0_14px_40px_rgba(44,39,34,0.10)] overflow-hidden">
+        <article className="bg-surface rounded-[14px] shadow-[0_14px_40px_rgba(30,42,51,0.10)] overflow-hidden">
           {/* Letterhead */}
           <div className="flex flex-wrap items-end justify-between gap-3 px-7 sm:px-10 pt-9 pb-5 border-b-2 border-ink">
             <div className="flex flex-col gap-1">
@@ -172,7 +172,7 @@ export default function HandoverPage() {
 
             {/* Right — info cards */}
             <div className="flex flex-col gap-4">
-              <div className="rounded-[14px] border border-hairline bg-[#F7F3EB] p-4">
+              <div className="rounded-[14px] border border-hairline bg-tint p-4">
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
                   Notified family
                 </h3>

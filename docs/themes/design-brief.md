@@ -132,14 +132,15 @@ Keep the functional steps from `user-flows.md`; below is the *design intent* per
 It will be implemented in **Next.js (App Router) + React + Tailwind CSS**. Practical implications:
 
 - Favour layouts and components that map to Tailwind utility styling and standard React components.
-- There is an existing **warm palette** you can build on or refine: a warm orange (self / primary
-  accent), a deep teal (caregiver), cream backgrounds, plus blue / amber / pink accents used to
-  differentiate the four pathway groups and service statuses. A dark brown is currently used for the
-  Autopilot "machine" world. Treat these as a starting point — you may evolve them, but please define
-  a final palette with hex values.
-- Typography currently pairs a serif (Playfair Display) for headlines with a clean sans (Geist) for
-  UI/body. Keep a similar "warm serif headline + neutral sans body" feeling unless you have a strong
-  reason to change.
+- **Palette = "Direction A" (cool / clinical), locked.** Self / primary accent is a **slate-blue**
+  (`#3B6CA8`) — orange has been fully removed. Caregiver stays **deep teal** (`#1C6B66`). Backgrounds
+  are a **cool off-white** canvas (`#F6F8FA`). The Autopilot "machine" world is a **cool slate-navy**
+  (`#14202B`), not warm brown. **Green** (`#2E7D58`) is reserved consistently for *verified / working /
+  done* (incl. the "just updated" beat). Pathway groups: This Week muted amber, Weeks 2–8 blue
+  (`#3B6FB0`), Apply Now green (`#3E8E5A`), Single Point plum (`#7C5AA6`). Full token set + old→new
+  remap in `implementation-spec.md` §3.
+- Typography pairs **Newsreader** (serif headlines, weights 500/600/700) with **IBM Plex Sans**
+  (UI/body, weights 400/500/600/700) — a clean, clinical "serif headline + neutral sans body" pairing.
 - No specific component library is required (the current app is bespoke Tailwind components), so you
   have freedom — just keep it implementable with plain React + Tailwind.
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Newsreader, IBM_Plex_Sans } from "next/font/google";
+import ClientProviders from "@/components/providers/ClientProviders";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -35,7 +36,9 @@ export default function RootLayout({
       lang="en"
       className={`${plexSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-cream text-ink text-lg">{children}</body>
+      <body className="min-h-full flex flex-col bg-cream text-ink text-lg">
+        <ClientProviders>{children}</ClientProviders>
+      </body>
     </html>
   );
 }

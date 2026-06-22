@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 import TalkToHuman from "@/components/ui/TalkToHuman";
+import { resetCycle } from "@/lib/care-cycle";
 import { DEMO_USERS } from "@/lib/demo-users";
 
 export default function LoginPage() {
@@ -21,6 +22,7 @@ export default function LoginPage() {
     // Clear any cached pathway so it regenerates for this user
     sessionStorage.removeItem("pathwayColumns");
     sessionStorage.removeItem("pathwayProfile");
+    resetCycle();
 
     router.push("/consent?mode=" + (user.role === "senior" ? "self" : "caregiver"));
   };
@@ -30,7 +32,7 @@ export default function LoginPage() {
       {/* Header */}
       <header className="px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity w-fit">
-          <Logo size={30} />
+          <Logo size={30} theme="dark" />
           <span className="font-serif font-bold text-autopilot-text text-lg tracking-tight">CareKaki</span>
         </Link>
         <TalkToHuman theme="dark" />

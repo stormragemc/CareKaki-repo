@@ -7,6 +7,7 @@ import Logo from "@/components/ui/Logo";
 import Link from "next/link";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import TalkToHuman from "@/components/ui/TalkToHuman";
+import { resetCycle } from "@/lib/care-cycle";
 import type { CareMode } from "@/lib/types";
 
 const DEMO_LOCATION = {
@@ -55,6 +56,7 @@ function OnboardInner() {
     sessionStorage.removeItem("pathwayColumns");
     sessionStorage.removeItem("pathwayProfile");
     sessionStorage.removeItem("autopilotAdapters");
+    resetCycle();
 
     router.push(`/consent?mode=${mode}`);
   };

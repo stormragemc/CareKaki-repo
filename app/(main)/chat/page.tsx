@@ -8,6 +8,7 @@ import ChatPanel from "@/components/chat/ChatPanel";
 import LiveCareProfile from "@/components/chat/LiveCareProfile";
 import ModeChip from "@/components/ui/ModeChip";
 import TalkToHuman from "@/components/ui/TalkToHuman";
+import FlowStepper from "@/components/ui/FlowStepper";
 import { useChatState } from "@/hooks/useChatState";
 
 const planButtonFill: Record<"self" | "caregiver", string> = {
@@ -39,6 +40,7 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col bg-cream">
+      <FlowStepper />
       {/* Sub-header: mode chip + human escape hatch + pathway CTA */}
       <div className="flex items-center justify-between gap-3 border-b border-hairline bg-surface px-4 py-2.5 sm:px-6">
         <ModeChip mode={mode} />

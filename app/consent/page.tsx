@@ -63,7 +63,7 @@ function ConsentInner() {
   const consent = demoUser?.consent ?? defaultConsent(mode);
 
   const handleApprove = () => {
-    router.push(`/chat?mode=${mode}`);
+    router.push(`/tutorial?mode=${mode}`);
   };
 
   return (

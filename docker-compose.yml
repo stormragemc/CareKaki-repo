@@ -18,6 +18,10 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       ICCP_BOT_TELEGRAM_TOKEN: ${ICCP_BOT_TELEGRAM_TOKEN:-}
       OPENFDA_API_TOKEN: ${OPENFDA_API_TOKEN:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-}
+      ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID:-}
+
       # When set, the backend registers its Telegram webhooks against this public URL
       # on startup (e.g. the ngrok tunnel below). Leave blank for the keyless demo.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}

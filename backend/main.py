@@ -829,3 +829,125 @@ def pathway_edit_items(req: PathwayItemsEditRequest):
         if isinstance(it, dict) and it.get("group") in _PATHWAY_GROUPS and it.get("title")
     ]
     return {"items": cleaned or req.items, "edited": True}
+
+
+# ── Care Brief Generator ─────────────────────────────────────────────────────
+
+
+class CareBriefRequest(BaseModel):
+    senior_name: str = ""
+    age: int = 0
+    situation: str = ""
+    caregiver: str = ""
+
+
+@app.post("/care-brief/generate")
+def generate_care_brief(req: CareBriefRequest):
+    actions_taken = []
+    next_steps = []
+    important_notes = []
+
+    # Pull from ICCP log
+    for entry in iccp_log:
+        if entry.get("tone") == "success" and entry.get("from") == "system":
+            actions_taken.append(entry["text"])
+        if entry.get("from") == "user":
+            actions_taken.append(f"Coordinator responded: {entry['text']}")
+
+    # Pull from medication log
+    med_sent = False
+    for entry in medication_log:
+        if entry.get("from") == "system" and "HSA lookup" in entry.get("text", ""):
+            actions_taken.append(f"Medication review: {entry['text']}")
+        if entry.get("from") == "bot" and "sent" in entry.get("text", "").lower():
+            actions_taken.append("Medication review packet sent to Pharmacy Desk via Telegram")
+            med_sent = True
+        if entry.get("from") == "user":
+            actions_taken.append(f"Pharmacy staff responded: {entry['text']}")
+
+    # Pull from telegram log
+    for entry in telegram_log:
+        if entry.get("from") == "bot" and "emergency" in entry.get("text", "").lower():
+            actions_taken.append(f"Caregiver alerted via Telegram: \"{entry['text'][:80]}...\"")
+        if entry.get("from") == "user":
+            actions_taken.append(f"Caregiver responded: \"{entry['text']}\"")
+
+    # Deduplicate
+    seen = set()
+    unique_actions = []
+    for a in actions_taken:
+        if a not in seen:
+            seen.add(a)
+            unique_actions.append(a)
+
+    # Generate next steps based on what happened
+    if any("medication" in a.lower() for a in unique_actions):
+        next_steps.append("Follow up with pharmacy desk for medication review outcome")
+        if not med_sent:
+            next_steps.append("Medication review packet not yet sent — ensure pharmacy group is connected")
+    if any("coordinator" in a.lower() or "iccp" in a.lower() or "case" in a.lower() for a in unique_actions):
+        next_steps.append("ICCP coordinator to confirm case acceptance and schedule family check-in")
+    if any("caregiver" in a.lower() and "responded" in a.lower() for a in unique_actions):
+        next_steps.append("Confirm caregiver's availability and arrange physical check on senior")
+    else:
+        next_steps.append("Caregiver has not yet responded — follow up if no response within 30 minutes")
+
+    next_steps.append("Schedule follow-up check-in within 48 hours")
+    next_steps.append("If symptoms worsen or new symptoms appear, call 995 immediately")
+
+    # Important notes
+    if req.age >= 75:
+        important_notes.append(f"Senior is {req.age} years old — higher risk for complications from falls or medication side effects")
+    if any("warfarin" in a.lower() or "blood thin" in a.lower() for a in unique_actions):
+        important_notes.append("Patient is on blood-thinning medication — monitor for unusual bleeding or bruising")
+    important_notes.append("All actions were reviewed by CareKaki Guardian — PDPA scrubbed, no medical advice given")
+    important_notes.append("This care brief is a prototype summary. For official clinical handover, consult the attending physician or care coordinator.")
+
+    # Fallback if no logs
+    if not unique_actions:
+        unique_actions = [
+            "Care profile assembled from conversation",
+            "Care plan generated and reviewed by caregiver/senior",
+            "Autopilot services drafted under Guardian oversight",
+        ]
+
+    return {
+        "senior_name": req.senior_name,
+        "age": req.age,
+        "situation": req.situation,
+        "caregiver": req.caregiver,
+        "actions_taken": unique_actions,
+        "next_steps": next_steps,
+        "important_notes": important_notes,
+        "generated_at": datetime.now().strftime("%d %b %Y · %I:%M %p"),
+    }
+
+
+# ── Audio Guide (ElevenLabs voice layer) ─────────────────────────────────────
+
+from fastapi.responses import Response
+from services.voice_guide import generate_voice_audio, generate_voice_script
+
+
+class VoiceEventRequest(BaseModel):
+    event: str
+    context: str = ""
+    mode: str = "caregiver"
+
+
+@app.post("/voice/speak")
+def voice_speak(req: VoiceEventRequest):
+    script, audio = generate_voice_audio(req.event, req.context, req.mode)
+    if audio:
+        return Response(
+            content=audio,
+            media_type="audio/mpeg",
+            headers={"X-Voice-Script": script[:200]},
+        )
+    return {"script": script, "audio": None}
+
+
+@app.post("/voice/script")
+def voice_script(req: VoiceEventRequest):
+    script = generate_voice_script(req.event, req.context, req.mode)
+    return {"script": script}

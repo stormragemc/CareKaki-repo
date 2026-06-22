@@ -11,6 +11,7 @@ export default function AudioGuideButton({ theme = "light" }: { theme?: "light" 
       enabled={guide.enabled}
       status={guide.status}
       micOn={guide.micOn}
+      micError={guide.micError}
       onEnable={guide.enable}
       onDisable={guide.disable}
       onPause={guide.pause}

@@ -3,11 +3,13 @@
 import { useState, useCallback, useRef } from "react";
 
 type GuideStatus = "off" | "idle" | "speaking" | "listening" | "paused";
+export type MicError = "denied" | "unsupported" | null;
 
 interface AudioGuideState {
   enabled: boolean;
   status: GuideStatus;
   micOn: boolean;
+  micError: MicError;
   lastScript: string;
 }
 
@@ -15,11 +17,16 @@ interface SpeechRecognitionResultEventLike {
   results: ArrayLike<ArrayLike<{ transcript: string }>>;
 }
 
+interface SpeechRecognitionErrorEventLike {
+  error: string; // e.g. "not-allowed", "no-speech", "network", "service-not-allowed"
+}
+
 interface SpeechRecognitionLike {
   lang: string;
   interimResults: boolean;
   maxAlternatives: number;
   onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -32,6 +39,7 @@ export function useAudioGuide() {
     enabled: false,
     status: "off",
     micOn: false,
+    micError: null,
     lastScript: "",
   });
 
@@ -43,8 +51,19 @@ export function useAudioGuide() {
       try { recognitionRef.current.stop(); } catch {}
       recognitionRef.current = null;
     }
-    setState((s) => ({ ...s, micOn: false }));
+    setState((s) => ({ ...s, micOn: false, micError: null }));
   }, []);
+
+  // Hard-stop whatever's currently playing (used on route changes) without
+  // turning the guide off — so the next page can narrate its own content.
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    stopListening();
+    setState((s) => ({ ...s, status: s.enabled ? "idle" : "off" }));
+  }, [stopListening]);
 
   const speak = useCallback(
     async (event: string, context: string = "", mode: string = "caregiver") => {
@@ -65,7 +84,7 @@ export function useAudioGuide() {
           audioRef.current = audio;
 
           const script = res.headers.get("X-Voice-Script") || "";
-          setState((s) => ({ ...s, lastScript: script }));
+          setState((s) => ({ ...s, lastScript: script, status: "speaking" }));
 
           audio.onended = () => {
             URL.revokeObjectURL(url);
@@ -100,13 +119,19 @@ export function useAudioGuide() {
     speak("guide_started", "", getMode());
   }, [speak]);
 
+  // Turn the guide on without the "welcome" line — used when a page wants to
+  // immediately narrate its own content (e.g. the tutorial "Read this aloud").
+  const enableSilently = useCallback(() => {
+    setState((s) => ({ ...s, enabled: true, status: "idle" }));
+  }, []);
+
   const disable = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
     stopListening();
-    setState({ enabled: false, status: "off", micOn: false, lastScript: "" });
+    setState({ enabled: false, status: "off", micOn: false, micError: null, lastScript: "" });
   }, [stopListening]);
 
   const pause = useCallback(() => {
@@ -143,13 +168,45 @@ export function useAudioGuide() {
         onResult(transcript);
       };
 
+      // Without an onerror handler, a permission denial fires onerror then onend
+      // immediately, silently resetting micOn → false so the button looks stuck.
+      recognition.onerror = (e: SpeechRecognitionErrorEventLike) => {
+        recognitionRef.current = null;
+        const isDenied =
+          e.error === "not-allowed" || e.error === "service-not-allowed";
+        setState((s) => ({
+          ...s,
+          micOn: false,
+          micError: isDenied ? "denied" : "unsupported",
+          status: s.enabled ? "idle" : "off",
+        }));
+      };
+
       recognition.onend = () => {
-        setState((s) => ({ ...s, micOn: false, status: s.enabled ? "idle" : "off" }));
+        // onend fires after both normal stop and after onerror; only clear micOn
+        // here — onerror already set micError if needed, so don't overwrite it.
+        setState((s) => ({
+          ...s,
+          micOn: false,
+          status: s.enabled ? "idle" : "off",
+        }));
       };
 
       recognitionRef.current = recognition;
-      recognition.start();
-      setState((s) => ({ ...s, micOn: true, status: "listening" }));
+      try {
+        recognition.start();
+      } catch {
+        // start() can throw synchronously if called while already active.
+        recognitionRef.current = null;
+        setState((s) => ({
+          ...s,
+          micOn: false,
+          micError: "unsupported",
+          status: s.enabled ? "idle" : "off",
+        }));
+        return;
+      }
+      setState((s) => ({ ...s, micOn: true, micError: null, status: "listening" }));
     },
     [state.status]
   );
@@ -166,12 +223,14 @@ export function useAudioGuide() {
   );
 
   return {
-    ...state,
+    ...state, // includes micError
     enable,
+    enableSilently,
     disable,
     pause,
     resume,
     speak,
+    stopAudio,
     startListening,
     stopListening,
     toggleMic,

@@ -44,7 +44,7 @@ export const DEMO_USERS: DemoUser[] = [
       mobility: "Walker after fall",
       conditions: "Mild hypertension, recent fracture",
       caregiver: "Daughter, full-time + 2 kids",
-      financialTier: "Per-capita ≤ $1,500 · full subsidy",
+      financialTier: "Per-capita income ~$1,400/mth · full subsidy",
       recentEvent: "Fell at home, discharged from SGH",
     },
     chatHistory: [
@@ -105,12 +105,12 @@ export const DEMO_USERS: DemoUser[] = [
     },
     profile: {
       name: "Mr Lim",
-      age: 82,
+      age: 72,
       living: "Lives alone · Toa Payoh",
-      mobility: "Walks independently, slower since the fall",
+      mobility: "Walks independently but unsteady since the fall",
       conditions: "Recovering from a fall last week",
       caregiver: "Daughter in London · keep informed",
-      financialTier: "Pension tier · Silver Support",
+      financialTier: "Pension tier · Silver Support (auto-assessed)",
       recentEvent: "Fell last week · home alone, family overseas",
     },
     chatHistory: [
@@ -140,7 +140,7 @@ export const DEMO_USERS: DemoUser[] = [
     },
     careBrief: {
       situation:
-        "Mr Lim, 82, fell last week and is now home alone in Toa Payoh. His family is overseas — his daughter is in London — so loneliness is a real risk alongside his recovery.",
+        "Mr Lim, 72, fell last week and is now home alone in Toa Payoh. His family is overseas — his daughter is in London — so loneliness is a real risk alongside his recovery.",
       cadence: "Weekly check-in · No family in the room",
       actions: [
         "Silver Support filed",
@@ -170,13 +170,13 @@ export const DEMO_USERS: DemoUser[] = [
       lng: 103.7300,
     },
     profile: {
-      name: "Mrs Wong's Mother",
+      name: "Wong Mei Lin",
       age: 74,
       living: "With daughter, 5th-floor flat with lift",
       mobility: "Wheelchair after knee surgery",
       conditions: "Post knee replacement, wound care needed, mild diabetes",
       caregiver: "Daughter (Mrs Wong), works part-time",
-      financialTier: "Per-capita ≤ $1,800 · partial subsidy",
+      financialTier: "Per-capita income ~$1,750/mth · partial subsidy",
       recentEvent: "Discharged from NUH after knee replacement surgery",
     },
     chatHistory: [
@@ -195,7 +195,7 @@ export const DEMO_USERS: DemoUser[] = [
       recentEvent: { source: "chat" },
     },
     consent: {
-      copy: "Mrs Wong's mother consents to share the data below. Mrs Wong (daughter) may then act on her behalf for this session.",
+      copy: "Wong Mei Lin consents to share the data below. Mrs Wong (daughter) may then act on her behalf for this session.",
       fields: [
         { label: "NRIC", value: "S••••567A" },
         { label: "Date of birth" },
@@ -206,7 +206,7 @@ export const DEMO_USERS: DemoUser[] = [
     },
     careBrief: {
       situation:
-        "Mrs Wong's mother, 74, was discharged from NUH after knee replacement and needs wound care at home. She lives with her daughter Mrs Wong, who works part-time.",
+        "Wong Mei Lin, 74, was discharged from NUH after knee replacement and needs wound care at home. She lives with her daughter Mrs Wong, who works part-time.",
       cadence: "Monthly callback · Family present locally",
       actions: [
         "Home nursing visits arranged",
@@ -217,7 +217,7 @@ export const DEMO_USERS: DemoUser[] = [
       consentsOnFile: [
         "Singpass verified",
         "MyInfo: NRIC · DOB · address · income · CPF",
-        "Delegation: Mrs Wong acts for her mother",
+        "Delegation: Mrs Wong acts for Wong Mei Lin",
       ],
     },
   },
@@ -227,8 +227,8 @@ export const DEMO_USERS: DemoUser[] = [
     avatar: "🧓",
     role: "senior",
     color: "#7B68EE",
-    tagline: "Full emergency — all systems",
-    scenario: "Senior collapsed and is unresponsive, triggers ALL adapters: ICCP escalation, AIC services, home nursing, medication review, and caregiver Telegram alert",
+    tagline: "High-acuity case — escalated to a human",
+    scenario: "High-acuity senior: discharged after a fall with a brief blackout, lives alone on a blood thinner with no primary caregiver. CareKaki escalates straight to an ICCP coordinator, flags an urgent clinician-led medication & falls review (without assessing the medication itself), and arranges home nursing, eldercare support, and a caregiver alert under confirm.",
     adapters: ["iccp", "nursing", "aic", "medication", "telegram"],
     location: {
       address: "Blk 123 Yishun Ring Road",
@@ -236,19 +236,19 @@ export const DEMO_USERS: DemoUser[] = [
       lng: 103.8350,
     },
     profile: {
-      name: "Uncle Raj",
+      name: "Rajesh Kumar",
       age: 85,
       living: "Alone, 2nd-floor flat, no lift",
       mobility: "Uses walking stick, unsteady",
       conditions: "Heart failure, on warfarin + furosemide + bisoprolol, history of falls",
       caregiver: "Nephew visits twice a week, no primary caregiver",
-      financialTier: "Per-capita ≤ $1,200 · full subsidy",
-      recentEvent: "Found collapsed at home, unresponsive for unknown duration",
+      financialTier: "Per-capita income ~$1,150/mth · full subsidy",
+      recentEvent: "Discharged from A&E yesterday after a fall with brief blackout",
     },
     chatHistory: [
       { role: "assistant", content: "Hi — tell me what's happening. How can CareKaki help?" },
-      { role: "user", content: "My uncle (85) was found collapsed at home. He lives alone and takes heart medication. We don't know how long he's been down." },
-      { role: "assistant", content: "This is urgent. I'm activating all care systems: alerting your caregiver, escalating to the ICCP coordinator, checking his medication for interactions, and finding the nearest eldercare and nursing support." },
+      { role: "user", content: "My uncle (85) was discharged from A&E yesterday after a fall — he blacked out for a bit. He lives alone, has heart failure, and takes a blood thinner. I'm worried about him." },
+      { role: "assistant", content: "Thank you for telling me. Given a recent blackout, his heart condition and blood-thinning medication, and that no one's regularly at home, this is beyond what I should handle on autopilot. I'm escalating you straight to a Care Corner coordinator now and flagging an urgent clinician-led medication and falls review. I won't make any decisions about his medication myself — that's for his care team. While the coordinator picks this up, shall I arrange a personal alert device and a home-safety visit?" },
     ],
     profileMeta: {
       name: { source: "myinfo" },
@@ -261,7 +261,7 @@ export const DEMO_USERS: DemoUser[] = [
       recentEvent: { source: "chat", justUpdated: true },
     },
     consent: {
-      copy: "You, Uncle Raj, are sharing the data below so CareKaki can match schemes and arrange care for you.",
+      copy: "You, Rajesh Kumar, are sharing the data below so CareKaki can match schemes and arrange care for you.",
       fields: [
         { label: "NRIC", value: "S••••567A" },
         { label: "Date of birth" },
@@ -272,12 +272,12 @@ export const DEMO_USERS: DemoUser[] = [
     },
     careBrief: {
       situation:
-        "Uncle Raj, 85, was found collapsed at home and lives alone with no primary caregiver — his nephew visits twice a week. He has heart failure and a history of falls.",
+        "Rajesh Kumar, 85, was discharged from A&E yesterday after a fall with a brief blackout and lives alone with no primary caregiver — his nephew visits twice a week. He has heart failure and a history of falls.",
       cadence: "Weekly check-in · No family in the room",
       actions: [
-        "Emergency escalation to ICCP coordinator",
+        "Urgent escalation to ICCP coordinator",
         "Home nursing arranged",
-        "Medication review against HSA registry",
+        "Flagged for clinician-led medication & falls review (not assessed by CareKaki)",
         "Nephew alerted via Telegram",
       ],
       consentsOnFile: [

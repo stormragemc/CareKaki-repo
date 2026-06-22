@@ -29,6 +29,13 @@ function fieldValue(profile: CareProfile, key: keyof CareProfile): string {
   return String(raw ?? "").replace(/\s*,\s*/g, ", ");
 }
 
+// In self mode the senior is the account holder, so the family member named in
+// the "caregiver" field is being kept informed, not operating on their behalf.
+function fieldLabel(key: keyof CareProfile, baseLabel: string, mode: CareMode): string {
+  if (key === "caregiver" && mode === "self") return "Notified family";
+  return baseLabel;
+}
+
 function FieldList({ profile, profileMeta, mode }: LiveCareProfileProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -39,7 +46,7 @@ function FieldList({ profile, profileMeta, mode }: LiveCareProfileProps) {
         return (
           <ProfileFieldCard
             key={key}
-            label={label}
+            label={fieldLabel(key, label, mode)}
             value={value}
             source={meta?.source ?? "chat"}
             justUpdated={meta?.justUpdated}

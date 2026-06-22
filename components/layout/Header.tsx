@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 import TalkToHuman from "@/components/ui/TalkToHuman";
+import AudioGuideButton from "@/components/ui/AudioGuideButton";
 
 export default function Header() {
   return (
@@ -13,7 +14,10 @@ export default function Header() {
           </span>
         </Link>
 
-        <TalkToHuman />
+        <div className="flex items-center gap-3">
+          <AudioGuideButton />
+          <TalkToHuman />
+        </div>
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 import TalkToHuman from "@/components/ui/TalkToHuman";
+import AudioGuideButton from "@/components/ui/AudioGuideButton";
 import GuardianBand from "@/components/ui/GuardianBand";
 import AgentWorkspace, { resolveActivePanelIds } from "@/components/autopilot/AgentWorkspace";
 import { loadDemoUser, loadCareProfile } from "@/lib/session";
@@ -48,6 +49,7 @@ export default function AutopilotPage() {
             >
               ← Back to plan
             </Link>
+            <AudioGuideButton theme="dark" />
             <TalkToHuman theme="dark" />
           </div>
         </div>

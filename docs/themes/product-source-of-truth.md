@@ -1,8 +1,7 @@
 # CareKaki — Product Source of Truth
 
 > **This document is the absolute source of truth for the CareKaki project.**
-> It captures *what we are building and why*, derived directly from the pitch deck
-> (`CareKaki_Demo_Deck`) and the 5-minute demo script (`docs/CareKaki_Demo_Script.md`).
+> It captures *what we are building and why*, derived from the actual running prototype.
 > When in doubt about product intent, scope, tone, or narrative — defer to this file.
 
 **Project:** CareKaki — an agentic Care Navigator
@@ -46,17 +45,18 @@ out what's right for their situation.**
 **One front door. Two ways in.**
 
 - **1 front door** — a single starting question.
-- **5 services** — orchestrated in the background, **all under one Guardian** (the deck's
-  original "6" folded Guardian into the count; Guardian is the *wrapper*, not a service — see §4 Beat 4).
-- **0 forms** — nothing is ever filled in by hand, because **Singpass login + MyInfo-on-consent**
-  bring in verified data (NRIC, income, CPF) with one tap (see §6c).
+- **5 services** — orchestrated in the background, **all under one Guardian** (Guardian is
+  the *wrapper/safety layer*, not a service tile).
+- **0 forms** — nothing is ever filled in by hand, because the care profile is built
+  entirely through conversation (LLM extraction from natural language). In production,
+  Singpass/MyInfo would additionally verify identity and income data.
 
 ---
 
-## 4. The four demo beats (the heart of the product)
+## 4. The demo beats (the heart of the product)
 
-These four moments are where the product is *understood*. Everything else is supporting
-material. **Slides 4 and 6 are the beats that make people "get it" — they carry the most weight.**
+These moments are where the product is *understood*. **Conversation and Autopilot are the
+beats that make people "get it" — they carry the most weight.**
 
 ### Beat 1 — One front door, two ways in (Landing)
 
@@ -65,9 +65,11 @@ The only choice we ever ask on day one: **"Who is this for?"**
 - **For myself** — a senior figuring things out (discharge, schemes, day-to-day support).
 - **For someone I care for** — a caregiver who needs a plan they can actually act on.
 
-Everything after this adapts to that single answer. **The two modes must be genuinely distinct**
-— different seeding, tone, and who-gets-notified — not just a cosmetic label, because the whole
-promise is that "everything adapts from here."
+Everything after this adapts to that single answer. **The two modes are genuinely distinct**
+— different greeting, different tone, different adapters, different Audio Guide narration.
+
+Below the two cards: **"Sign in with existing account"** — leads to a Netflix-style profile
+picker with 4 pre-seeded demo users, each showcasing different scenarios and locations.
 
 ### Beat 2 — A conversation, not a form (Living Care Profile) ⭐
 
@@ -76,34 +78,35 @@ The hero moment. The user simply **talks**; there are no forms or dropdowns.
 As they talk, CareKaki assembles a **Living Care Profile** in real time on the right — name,
 age, living situation, mobility, conditions, caregiver context, financial tier, recent event.
 
-**Every field is extracted from natural conversation. No form is ever filled.** A few turns
-in, CareKaki already has enough to act.
+**Every field is extracted from natural conversation by the LLM (GPT-4o-mini, JSON mode).
+No form is ever filled.** A few turns in, CareKaki already has enough to act.
 
-> **How "zero forms" stays true:** the *narrative* fields come from conversation, but
-> means-tested / identity data (NRIC, income, financial tier) is **not** guessed from chat —
-> it flows in from **Singpass login + MyInfo-on-consent** (Singapore's official autofill). So
-> "no form" is *literally* true, and the data is verified, not inferred (see §6c).
+**Audio Guide:** When enabled, ElevenLabs narrates what's happening ("I've noted that,
+updating the profile now"). The mic button lets the user speak instead of type — speech
+goes through browser Speech Recognition and is sent as a chat message to the LLM.
+
+**Emergency detection:** If the user's message contains emergency keywords (fell, collapsed,
+chest pain, seizure, not breathing, etc.), the system detects it instantly (no LLM call),
+selects the appropriate adapters, and redirects straight to Autopilot — skipping the
+pathway and review steps.
 
 ### Beat 3 — Not a list. A plan. (Pathway) ⭐
 
-From the profile, CareKaki generates a **personalised pathway** — grouped by *what needs to
-happen when*, not a flat list:
+From the profile, CareKaki generates a **personalised pathway** via GPT-4o-mini (JSON mode)
+— grouped by *what needs to happen when*, not a flat list:
 
-- **This Week** — get home safely (home-safety walk-through, walker + grab-bar fitting, caregiver basics).
-- **Weeks 2–8** — ongoing care (home nursing visits, physio/rehab, medication review).
-- **Apply Now** — financial support the family actually qualifies for (HCG, MediFund top-up, CHAS review).
-- **Single Point** — one coordinator to pull it all together (ICCP case officer, family loop, monthly check-in).
-
-> **Naming accuracy (Care Corner is in the room):** do **not** label physio/rehab as a
-> "polyclinic" service at SACH — **SACH (St Andrew's Community Hospital) is a community
-> hospital, not a polyclinic.** Polyclinics are SingHealth / NUP. Use "physio/rehab at SACH"
-> or name an actual polyclinic.
+- **This Week** — get home safely.
+- **Weeks 2–8** — ongoing care.
+- **Apply Now** — financial support the family qualifies for.
+- **Single Point** — one coordinator to pull it all together.
 
 **Every recommendation explains itself** with a *"Why this for you"* tag traced to a real
-profile fact (e.g. "Lives alone post-discharge", "Per-capita income within tier"). This is
-reasoning the family can **trust**.
+profile fact (e.g. "Lives alone post-discharge", "Income within tier").
 
-When a case is complex, CareKaki offers a **warm handover** to a Care Corner coordinator.
+**Editable:** A side chat panel lets the user say "remove the nursing visit, I'll handle
+that myself" — the LLM regenerates the plan with the change. Human-in-the-loop, before
+anything runs. With Audio Guide on, the voice acknowledges edits ("Got it, updating the
+plan") and confirms completion ("Done, plan refreshed").
 
 ### Beat 4 — Autopilot: the agent does the work ⭐⭐
 
@@ -112,36 +115,60 @@ The signature moment.
 > A normal AI tool generates a checklist for *someone else* to go and do.
 > **Autopilot just does it** — five services, in parallel, right now, **all under one Guardian**.
 
-**The remodeled set — 5 real-world services spanning *medical AND social* care, wrapped by
-Guardian** (the deck's "6th card" was Guardian itself; it is the wrapper, not a service):
+**The five services (all running against real data or real messaging channels):**
 
-1. **Financial — Home Caregiving Grant (AIC).** Filed with NRIC + income docs that came from
-   **MyInfo-on-consent**, not a form (reconciles "zero forms" with "filed with income docs").
-2. **Clinical — Home nurse visit (Home Nursing Foundation / NTUC Health).** Booked with lift
-   access + caregiver contact, and a **real Google Calendar invite** is sent (a live anchor).
-3. **Social — Active Ageing Centre (AAC) enrolment.** The whole-person agent; this is what makes
-   Mr Lim's loneliness case diverge from Mdm Tan's, on the *same* engine (see §5).
-4. **Coordination — Care Corner / ICCP warm handover (THE HERO).** Routed to the least-loaded
-   officer (Aunty Mei — **confirm with Care Corner whether this should stay a placeholder name
-   or reference an actual coordinator**, since the partner will be in the room) with the **Care
-   Brief preloaded**. The partner is in the room — this is the emotional peak of the slide, not
-   one tile of six.
-5. **Comms — WhatsApp to the family.** Plain-language summary + reassurance thread — the
-   **genuinely live** integration (a real message lands on a real phone).
+1. **Caregiver Alert (Telegram)** — pushes emergency alert to the caregiver's Telegram DM
+   with one-tap response buttons: *I'm going now · Call ambulance · Ask neighbor · Escalate*.
+   Free-text replies are classified by the LLM (intent, status, ETA, urgency).
+2. **ICCP Coordinator (Telegram)** — assembles a case packet, sends it to a coordinator
+   Telegram group with accept/escalate/request-info buttons. All interactions logged for the
+   Care Brief.
+3. **AIC Eldercare Services** — searches 140 Senior Activity Centres from real data.gov.sg
+   GeoJSON. Scored by keyword relevance + haversine distance. Rendered on a Leaflet +
+   OpenStreetMap map with numbered markers and fullscreen mode.
+4. **HomeNursing.sg** — searches CHAS clinics from real data.gov.sg GeoJSON. Extracts clinic
+   name, phone, programmes (CDMP/CHAS/ISP). Generates simulated availability slots.
+5. **Medication Review** — extracts medication names, searches HSA Registered Therapeutic
+   Products CSV, enriches with openFDA drug label API (warnings, precautions, adverse
+   reactions). Rule-based risk classification (age, symptoms, forensic classification).
+   Routes formatted review packet to pharmacy desk on Telegram with accept/reject buttons.
 
-**Guardian wraps all five** (no medical advice · PDPA scrubbed · human one click away) — shown
-as a shield/status layer across the top, not as a sixth tile.
+**Guardian wraps all five** — shown as a band across the top. PDPA redaction, no-medical-advice
+classifier, human gate, traceability tags on every panel.
 
-The payoff:
+**Dynamic adapter selection:** Not all 5 always run. The system selects adapters based on the
+situation:
+- Fall/collapse → ICCP, AIC, Telegram
+- Medication concern → Medication, Telegram
+- Chest pain/stroke → ICCP, Telegram
+- Nursing/wound/rehab → Nursing, ICCP
+- No match → all 5
 
-> **When the coordinator calls tomorrow, she already knows everything. The family never
-> repeats themselves.** ← this is the **warm handover**.
+Fewer adapters = wider panels (CSS flex-1). Different users see different autopilot layouts.
 
-> **Consent model — draft-then-confirm:** Autopilot *prepares* every action as a ready-to-send
-> draft the user approves (one tap, or "approve all"). Nothing irreversible happens unilaterally.
-> The only thing that bypasses confirmation is **escalating to a human coordinator faster** — not
-> autonomous action. This strengthens "the agent does the work" (it did the labour; the human
-> just says yes) and sits under Guardian's human-in-the-loop principle.
+**Consent model — draft-then-approve:** Autopilot *prepares* every action; the user approves
+before anything irreversible runs. Three panels (ICCP, Nursing, Medication) show an "Approval
+Required" overlay. Two (AIC search, Telegram alert) auto-run because they're read-only. Only
+human-escalation bypasses confirmation.
+
+**Audio Guide on Autopilot:** Before approval, the voice explains what will happen ("I'm
+planning three things..."). After approval: "Okay, working on it now." Voice input on this
+page can say "approve" to trigger the approval button.
+
+### Beat 5 — Care Brief: the warm handover
+
+The Care Brief is generated live from the in-memory logs (`telegram_log`, `iccp_log`,
+`medication_log`). It shows:
+
+- **Situation** — the patient's context in plain words.
+- **Actions taken by CareKaki** — pulled from real adapter logs: "Caregiver alerted via
+  Telegram," "Medication review sent to Pharmacy Desk," "ICCP case packet assembled."
+- **Recommended next steps** — generated based on what happened (e.g. "Follow up with
+  pharmacy desk," "Confirm caregiver availability," "Schedule check-in within 48 hours").
+- **Important notes** — contextual warnings (age ≥ 75 flag, blood thinner flag).
+- **Guardian footer** — "Guardian-checked · PDPA scrubbed · no medical advice given."
+
+When the coordinator picks up, they already know everything. The family never repeats themselves.
 
 ---
 
@@ -149,30 +176,38 @@ The payoff:
 
 The proof that CareKaki *reasons* rather than templates: **same engine, different person.**
 
+**Four demo users, each in a different part of Singapore:**
 
-|               | **Mdm Tan, 78**                                             | **Mr Lim, 72**                                                 |
-| ------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
-| Context       | Caregiver: daughter Wei Ling, **local**, full-time + 2 kids | Caregiver: daughter in **London** (kids overseas)              |
-| Finance       | Home Caregiving Grant                                       | Silver Support Scheme (pension tier)                           |
-| Social        | Family already present                                      | Active Ageing Centre — because the real risk is **loneliness** |
-| Check-ins     | Single coordinator callback                                 | **Weekly** check-in cadence (no family in the room)            |
-| Notifications | WhatsApp to caregiver                                       | WhatsApp to daughter overseas                                  |
+| User | Role | Location | Adapters | Scenario |
+|------|------|----------|----------|----------|
+| **Mdm Tan, 78** | Senior | Ang Mo Kio | ICCP, AIC, Telegram | Fall + coordinator escalation |
+| **Mr Lim, 72** | Senior | Toa Payoh | AIC, Nursing, ICCP, Telegram | Fall + loneliness, family overseas |
+| **Mrs Wong** | Caregiver | Jurong East | Nursing, AIC, ICCP | Post-surgery, needs home nursing |
+| **Uncle Raj, 85** | Senior | Yishun | ALL 5 | Full emergency — collapsed, heart failure, warfarin |
 
+Different locations = different AIC/nursing results. Different conditions = different adapters
+activated. Different caregiver situations = different notification flows.
 
 > **Same intent. Different context. CareKaki reads the room.**
 
-> **Persona clarity (fix the "self mode" ambiguity):** the Mr Lim slide is headed *Self mode*
-> but shows a WhatsApp thread with his daughter in London. Be unambiguous about **who opens the
-> app, who is typing, and who receives the WhatsApp.** Recommended reading: Mr Lim self-navigates
-> (he is the user), and the daughter is a **notified family member**, not the operator — keep the
-> divergence (Silver Support, AAC, weekly check-ins, WhatsApp to daughter), just fix who's who.
-
 ---
 
-## 6. Architecture (cloud-native, API-driven)
+## 6. Architecture
 
-*Built for the cloud. Built around the agent.* (For the technical judges — hit these words
-clearly: **cloud-native, microservices, API-first, Kubernetes, Responsible AI.**)
+### What's actually built (the running prototype)
+
+```
+Frontend: Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · Leaflet/react-leaflet
+Backend:  FastAPI (Python) — one modular monolith, ~830 lines
+LLM:      OpenAI GPT-4o-mini (chat, extraction, pathway, voice scripts)
+Voice:    ElevenLabs (TTS) + browser Web Speech API (STT)
+Messaging: Telegram Bot API (2 bots: CareBridge caregiver + ICCP coordinator)
+Maps:     Leaflet + OpenStreetMap (free, no API key)
+Data:     CHAS Clinics GeoJSON · Eldercare Services GeoJSON · HSA CSV · openFDA API
+Infra:    Docker Compose (web + backend + ngrok) · ngrok tunnel for Telegram webhooks
+```
+
+### Target architecture (what slides show)
 
 ```
 CLIENT SURFACES   Web app · Mobile PWA · WhatsApp bot
@@ -184,168 +219,80 @@ MICROSERVICES     Conversation · Profile Builder · Pathway Reasoner · Autopil
 AGENT PLANE       LLM (reasoning + tool-use)  ·  Guardian (safety + PDPA + escalation)
         │
 IDENTITY/DATA     Singpass (login) · MyInfo (verified data on consent)
-INTEGRATIONS      AIC API · Home Nursing · ICCP coordinator · WhatsApp Business · Polyclinic · AAC · Google Calendar
+INTEGRATIONS      AIC API · Home Nursing · ICCP coordinator · WhatsApp Business · Google Calendar
 ```
 
-Properties (target architecture): **Kubernetes-orchestrated · containerized · stateless
-services · event-driven · API-first · observable.** Each service is designed to be
-independently deployable.
+### Why the gap is intentional
 
-> **Build status:** no k8s manifests exist yet (see `user-flows.md` §6, "Cross-cutting"). Say
-> "designed for" rather than implying a cluster is already running, unless one actually is by
-> demo day.
+The prototype validates **core flows** (conversation → profile → pathway → autopilot → brief)
+in a modular monolith. Each adapter is a separate Python module in `services/`. Splitting into
+microservices is a **deployment decision, not a code rewrite**. The architecture is designed for
+K8s; the MVP runs on Docker Compose because that's what ships in hackathon time.
 
-> **The agent never talks to a service directly — only through APIs, only after Guardian.**
+Key divergences from target and their justifications:
 
----
-
-## 6a. Integrations — a reference architecture, not a fake
-
-The agencies CareKaki orchestrates (AIC, HomeNursing.sg, the ICCP coordinator pool,
-Polyclinic / SMF, WhatsApp Business) are the **real** institutions in Singapore's care
-journey — they are the exact maze families drown in (see §2). Depicting them in Autopilot is
-correct product design: an orchestrator that skipped the hard government and healthcare rails
-would be solving the wrong problem.
-
-What CareKaki demonstrates is the **target operating model** — *what this looks like once the
-agencies are on board.* Crucially, draw the line between **depiction and claim**:
-
-- **The orchestration is real.** The Autopilot Orchestrator genuinely fans out to each
-  integration in parallel, manages real async state, and progresses statuses over time.
-- **The agency endpoints are simulated against their real interfaces.** Going live on the
-  government / healthcare rails is a **partnership, credentialing, and data-governance step —
-  not an engineering one.**
-
-This is not vapourware: these integrations exist in the world and would be unlocked by
-adoption, not by more code. AIC runs provider-facing referral/case systems that partner orgs
-file through; **Care Corner, as an ICCP provider, is precisely the partner that switches on
-ICCP routing**; polyclinics sit behind national health IT. Every "simulated" tag is therefore
-a **deployment step, not a missing feature** — a roadmap of what flips on as each agency joins.
-
-**Posture: anchor with real rails, simulate the rest — never substitute.** Do **not** swap the
-real care agencies for whatever happens to have a public API; the agencies *are* the product.
-Instead, prove capability with the rails that are genuinely accessible, so the simulated ones
-inherit that credibility:
-
-- **Real anchors (genuinely live in the demo):**
-  - **WhatsApp** — Meta's Business Cloud API; a real message lands on a real phone (see §6b).
-  - **Singpass / MyInfo** — via the **official government sandbox** (test personas); the real
-    consent flow, in test mode. This directly proves "we plug into government rails when approved."
-  - **Google Calendar** — a real nurse-visit invite lands in the caregiver's calendar.
-- **Simulated against real contracts (government-approval-gated future state):** AIC grant,
-  Home Nursing, ICCP / Care Corner routing, polyclinic / medication.
-
-The honest, *strong* framing for Q&A:
-
-> "These are the real agencies in the journey. The orchestration is live — you saw a real
-> WhatsApp arrive, a real calendar invite, and identity + data flowing through the official
-> Singpass/MyInfo sandbox. The agency actions (AIC, ICCP, polyclinic) are simulated against
-> their real interfaces, because going live there is a partnership and data-governance approval,
-> not engineering. The sandbox is the same door, just in test mode. This is what CareKaki looks
-> like the day the agencies adopt it."
-
-That answer makes the simulation read as a **roadmap**, not a gap — and never over-claims.
+| Target | Prototype | Why |
+|--------|-----------|-----|
+| WhatsApp Business API | Telegram Bot API | Telegram has instant bot creation; WhatsApp requires Meta business verification. Same adapter interface. |
+| Singpass/MyInfo | Consent UI mockup | Government sandbox access requires approval. Integration point is designed. |
+| Google Calendar | Not built | Time constraint. Would be a simple API call from the nursing adapter. |
+| 5 microservices on K8s | 1 FastAPI monolith on Docker Compose | Faster iteration. Modular code structure supports future split. |
+| Supabase (Postgres) | In-memory Python state | No network dependency = zero risk during live demo. Clean restart = clean demo. |
+| Claude/Gemini | OpenAI GPT-4o-mini | Migrated from Gemini (5 req/min free tier limit). GPT-4o-mini is fast, cheap, reliable. |
 
 ---
 
-## 6b. WhatsApp — the one real integration (and how it scales)
+## 6a. Data sources — real Singapore government data
 
-WhatsApp is the single integration that is **genuinely live**, because it is the one rail
-that's publicly accessible: **Meta's WhatsApp Business Cloud API**. When Autopilot fires, a
-real message lands on a real phone — the undeniable proof that CareKaki reaches the outside
-world. Everything else follows the same contracts the day access is granted.
+CareKaki's adapters run against **real datasets**, not mocked data:
 
-### It is production-grade, not a demo toy
+- **Eldercare Services GeoJSON** (data.gov.sg) — 140 Senior Activity Centres with coordinates,
+  addresses, postal codes. HTML tables inside GeoJSON features, parsed with regex extraction.
+- **CHAS Clinics GeoJSON** (data.gov.sg) — hundreds of CHAS clinics with name, phone, programme
+  codes (CDMP/CHAS/ISP), building, floor/unit.
+- **HSA Registered Therapeutic Products CSV** (data.gov.sg) — every registered drug in Singapore.
+  Product name, active ingredients, forensic classification, dosage form, manufacturer.
+- **openFDA drug label API** (US FDA) — public drug label warnings, precautions, adverse
+  reactions. Secondary enrichment layer, not primary dataset.
 
-The Cloud API *is* the production system — since the On-Premises API was deprecated
-(Oct 2025), it is the **only** sanctioned way anyone sends WhatsApp programmatically, startup
-to enterprise. The prototype and the live product run on the **same API, same send code, same
-templates, same webhooks.** Scaling up is **configuration and compliance, not a rewrite:**
+The scoring algorithm for AIC and Nursing adapters:
+1. Parse HTML description field from GeoJSON features
+2. Classify care need into keywords
+3. Score each service: `keyword_matches × 10 + senior_keyword_bonus × 3`
+4. If location provided: `distance_score = max(0, 30 - distance_km × 3)` (haversine)
+5. Total = match_score + distance_score, sorted descending
 
-| Demo (prototype) | Live product |
-| --- | --- |
-| Meta **test sender number** (`+1 555…`) | Own **registered, verified** business number |
-| **5 whitelisted** recipients | Anyone who has **opted in** |
-| **Unverified** → 250 business-initiated convos/day | **Business-verified** → 100,000/day → unlimited at high quality |
-| Temporary token | Permanent **System-User** token (same approach in prod) |
-
-The unlock from demo to live is **Meta Business Verification** (a KYC/paperwork gate) + your
-own number + opt-in capture — **not** more engineering. The API, send code, template
-structure, webhooks, and architecture are **byte-for-byte identical** across demo and
-production; verification is the single gate that bundles the rest (own number + display name,
-opt-in recipients, and automatic limit scaling).
-
-### Timelines — demo is same-day, production is ~a week of review queues
-
-| Path | Time | Notes |
-| --- | --- | --- |
-| **Demo / prototype** | **Same day (~15–60 min)** | Test number provisioned instantly; `hello_world` template pre-approved (sends in seconds). A **custom** template takes minutes–hours (≤24h) — submit it a day or two early so it's safely approved. **No business verification needed.** |
-| **Production / live** | **~3–10 business days** | Dominated by **Meta Business Verification: 2–5 business days** (can stretch to ~14 if legal name/docs mismatch). Display-name review same-day–2 days; first template approvals 1–24h. |
-
-Both paths involve only ~15–20 min of actual setup clicks — the rest is Meta's review queue.
-The biggest avoidable delay is a **legal business name that doesn't exactly match the
-registration documents**. Care Corner, as an established entity, clears verification far faster
-than a brand-new startup would. Net: **the demo carries zero schedule risk; production is a
-~1-week paperwork-latency step, not a build-effort one.**
-
-### Permanent platform constraints to design around
-
-These are WhatsApp platform rules everyone lives with — design the product around them now:
-
-1. **The 24-hour window.** Free-form messages are only allowed within 24h of the *user*
-   messaging you. CareKaki's proactive nudges (most of the "WhatsApp the caregiver" flow) are
-   **business-initiated**, so they must be **pre-approved templates** (Meta review, usually
-   fast but up to ~24–48h — never leave to demo day).
-2. **Opt-in is mandatory.** You cannot message someone who hasn't consented. Clean for
-   CareKaki — capture caregiver consent during onboarding.
-3. **Per-message pricing.** Post-July-2025 billing is per template message (Utility cheap /
-   free in-window; Marketing pricier). Cheap and predictable at care-coordination volumes,
-   but a real line item.
-
-### The architectural answer (and the scaling concern, resolved)
-
-WhatsApp is a **Meta-governed channel** (their policies, quality ratings, pricing). The mature
-design — and the right thing to say to judges — is that **WhatsApp is one notification adapter
-behind CareKaki's own messaging interface**, so SMS, email, or Telegram can be added without
-touching the rest of the system. This is exactly what the architecture implies ("WhatsApp
-Business" as one integration behind the gateway). So WhatsApp **does** scale to a real product;
-the only discipline is to keep it a **swappable adapter**, never the sole hard-wired channel.
-
-> Honesty note for Q&A: the demo sends from a Meta **test number**, not a verified "CareKaki"
-> business number (verification is a longer KYC step). Fine for a prototype — don't claim it's
-> a production business account if asked.
+**No LLM involved in adapter scoring.** Pure data + rules + math.
 
 ---
 
-## 6c. Identity & data — Singpass + MyInfo (how "zero forms" is literally true)
+## 6b. Messaging — Telegram (production target: WhatsApp)
 
-Singpass is Singapore's national digital identity, and it gives CareKaki two things in one flow:
+The prototype uses **Telegram** because it has instant bot creation (BotFather → token → done).
+Two bots:
 
-1. **Login (authentication)** — "Log in with Singpass" via **OpenID Connect**: a verified
-   assertion of *who* the user is. Familiar, trusted, no passwords to manage.
-2. **MyInfo (verified data, on consent)** — after login, CareKaki requests a **specific set of
-   MyInfo fields** (NRIC, DOB, address, **income from IRAS**, CPF). The user sees a consent
-   screen listing exactly what's requested and approves; the data returns **signed and verified**.
-   MyInfo is literally Singapore's official form-autofill service.
+- **CareBridge bot** — caregiver DMs. Receives `/start` to register `chat_id`. Sends emergency
+  alerts with inline buttons. Classifies free-text replies via GPT-4o-mini.
+- **ICCP bot** — coordinator group. Receives `/coordinator` to register group `chat_id`. Sends
+  case handover packets and medication review packets. Both use inline buttons (Accept/Escalate/
+  Request More Info).
 
-**Why this matters:** it is the canonical resolution to the "zero forms" vs "filed with NRIC +
-income docs" tension. The identity/means-tested data Autopilot needs to file the Home Caregiving
-Grant flows in from **MyInfo-on-consent**, not from a typed form and not inferred from chat. So
-"0 forms" is *literally* true — and more impressive: not "we skipped the form," but "the data
-flows from the national source with one consent tap."
+Both bots share one ngrok tunnel. Webhooks: `/telegram/webhook` and `/iccp/webhook`.
 
-**Demo vs production:** the demo uses the **official Singpass/MyInfo sandbox** (synthetic test
-personas) — the real consent flow in test mode, which itself proves "we integrate with
-government rails." Production swaps in the live MyInfo API (a registration/approval step).
+**The adapter interface is identical** to what WhatsApp would use: message + buttons + webhook
+callback. When WhatsApp Business API access is approved, the same flow plugs in. Telegram was
+chosen for demo reliability, not as a permanent channel decision.
 
-**Delegation wrinkle (have the answer ready):** a caregiver acting for a senior is a delegation
-case (whose Singpass?). Singapore doesn't have one generic "delegate my Singpass" API — what
-exists today is service-specific (e.g. HealthHub's caregiver-link model for Healthier SG, or the
-next-of-kin / Lasting Power of Attorney route required for checking government benefits on
-someone else's behalf). **CareKaki's flow models that same pattern, not a real integration**: the
-senior consents once at onboarding, and the caregiver acts on their behalf for the rest of the
-session. Be ready to say plainly, if asked, that the actual delegation mechanism is simulated, and
-going live would mean partnering with whichever agency's rail it ends up modeling.
+---
+
+## 6c. Identity & data — production roadmap
+
+The prototype builds the care profile entirely through **LLM conversation extraction**. The
+consent screen exists as a UI mockup showing what Singpass/MyInfo integration would look like.
+
+**Production path:** Singpass login (OpenID Connect) + MyInfo-on-consent brings in verified
+NRIC, DOB, address, income (IRAS), CPF. The profile fields map 1:1 to MyInfo's schema. The
+integration point is designed; sandbox access is the production step.
 
 ---
 
@@ -353,37 +300,76 @@ going live would mean partnering with whichever agency's rail it ends up modelin
 
 > **Safety is an architectural choice, not a prompt instruction.**
 
-Guardian is designed as a **policy plane between the LLM and the world** — an actual service,
-auditable, testable, deployable. Every CareKaki action is meant to flow through it.
+Guardian is a **real, separately callable safety service** (`backend/services/guardian.py`).
+It is deterministic (rule-based), not probabilistic. It wraps the live `/chat` path — every
+LLM reply passes through `guardian_check` before reaching the user.
 
-> **Build status (added in judge-review pass, 2026-06-17):** Guardian does not exist as a running
-> service yet — see `user-flows.md` §6, "Cross-cutting." Until at least a minimal stub exists,
-> describe Guardian as the safety architecture the product is built around, not as a service a
-> judge can be shown live.
+**Independently callable:** `POST /guardian/check` — judges can call it live during Q&A.
 
-Six principles:
+Four implemented principles:
 
-1. **No medical advice** — clinical questions are intercepted and routed to a human. CareKaki recommends categories of services already vetted by Care Corner's intake criteria (e.g. "eligible for home nursing visits") — it never assesses condition severity, diagnoses, or judges treatment appropriateness itself.
-2. **PDPA-aware by default** — NRIC, income, and medical details tokenised at ingest; **designed so** PII never leaves the regional boundary *(verify this against whichever cloud region the team actually deploys to before claiming it — don't assert it until it's confirmed)*.
-3. **Human-in-the-loop** — complexity and risk signals auto-escalate to a Care Corner coordinator; no LLM-only decisions on care plans. **Autopilot is draft-then-confirm** (the user approves every action; only human-escalation bypasses confirmation — see §4 Beat 4).
-4. **Traceable recommendations** — every recommendation links back to facts in the Living Care Profile (the "why this for you" tags); auditable, never hand-wavy.
-5. **Bias monitoring** — pathway outputs sampled weekly; coverage across income tiers and conditions reviewed by Care Corner. **This is a post-launch governance commitment, not a feature running in the prototype** — don't imply a live dashboard exists today. *(Note: soften any hard "languages" claim — the demo is English-only; multilingual is real at the conversation layer but a config step for the UI. See the Q&A answer below.)*
-6. **One click to human** — a coordinator is reachable from every screen; the family never has to ask twice.
+1. **PDPA redaction** — regex catches Singapore NRIC (S/T/F/G/M + 7 digits + letter), phone
+   numbers (8-digit SG format), emails. Replaces with masked versions: `S1234567A` → `S****A`.
+   Deterministic, every time.
+2. **No medical advice** — scans for patterns: "take X mg", "prescribe", "diagnose", "stop
+   taking", "increase dosage". Appends disclaimer if triggered. CareKaki never answers clinical
+   questions — it routes to a human.
+3. **Human gate** — detects risky actions (submit, book, apply, escalate, call 995, handover).
+   Sets `requires_confirmation` flag. Autopilot panels with risky actions show "Approval
+   Required" overlay.
+4. **Traceability** — every decision tagged with adapter name, data sources, and timestamp.
+   Panel headers show source labels (e.g. "HSA CSV · openFDA API").
 
-> **Multilingual — the Q&A answer:** multilingual is essentially free in the architecture, not a
-> bolt-on. The agent is an LLM, so the conversation already works in Mandarin, Malay, Tamil, or
-> Singlish; the profile is structured data, so it's language-independent; and MyInfo can carry the
-> senior's preferred language. The demo is English for clarity; productionizing means translating
-> fixed UI strings and getting WhatsApp templates approved per language (WhatsApp supports a
-> language code per template) — configuration, not re-engineering. **We haven't load-tested
-> extraction quality across languages yet, so the honest claim is "the architecture supports
-> it," not "it's already proven equally good in every language."** Care Corner's role is to
-> review pathway quality across language groups once it's live — that's a post-launch check,
-> not something to claim is already done.
+**Not yet implemented (production roadmap):**
+- Bias monitoring — log demographic assumptions for weekly review with Care Corner.
+- Regional data residency verification.
 
 ---
 
-## 8. What makes CareKaki different (five things, found together nowhere else)
+## 8. Audio Guide — voice layer
+
+An optional voice companion powered by **ElevenLabs** (text-to-speech) and **browser Web
+Speech API** (speech-to-text).
+
+### How it works
+1. User clicks "Audio Guide" button in header → `guide_started` event
+2. Backend: GPT-4o-mini generates a short spoken script (2-3 sentences, warm caregiver tone)
+3. Script → ElevenLabs API → MP3 audio bytes
+4. Frontend plays audio, shows status: Speaking / Listening / Ready / Paused
+
+### Voice events (triggered at key moments)
+| Event | When | What it says |
+|-------|------|-------------|
+| `guide_started` | Guide enabled | Welcome greeting |
+| `tutorial_overview` | Tutorial page | Explains the full journey |
+| `profile_updated` | Chat extracts a field | Brief acknowledgment |
+| `care_plan_created` | Pathway loads | Casual plan summary |
+| `care_plan_edit_*` | User edits plan | Short confirm/done |
+| `autopilot_explanation` | Autopilot loads | Explains actions before approval |
+| `autopilot_approved` | User approves | "Working on it now" |
+| `care_brief_ready` | Care brief loads | Calm handover summary |
+| `voice_input_*` | User speaks on any page | Contextual voice reply |
+
+### Voice input by page
+- **Chat:** Speech → sent as chat message → LLM responds
+- **Pathway:** Speech → edits the care plan ("remove the nursing visit")
+- **Autopilot:** Speech → can say "approve" to trigger approval
+- **Care Brief:** Speech → contextual Q&A about the brief
+
+### Anti-collision
+- New `speak()` cancels any current audio (AbortController on fetch + audio.pause)
+- 500ms debounce prevents rapid-fire from React re-renders
+- Mic auto-mutes while AI is speaking
+- Route changes stop all audio
+
+### Voice personality
+Warm, calm, middle-aged caregiver style. Simple language. Never diagnoses, prescribes, or
+mentions technical terms (APIs, databases, adapters). Under 3-4 sentences per response.
+Adjusts for senior users (extra simple and gentle).
+
+---
+
+## 9. What makes CareKaki different (five things, found together nowhere else)
 
 1. **Living Care Profile** — built through conversation, never a form; it assembles itself as the family talks.
 2. **Agentic Navigator** — reasons across schemes and services, not just retrieves them. A plan, not a search result.
@@ -393,7 +379,7 @@ Six principles:
 
 ---
 
-## 9. The vision
+## 10. The vision
 
 > **Excellent care already exists in Singapore. CareKaki is how families actually reach it.**
 >
@@ -403,22 +389,33 @@ Six principles:
 
 **1 front door · 5 services orchestrated (under one Guardian) · 0 forms to fill in.**
 
-*(The deck's memorable "1 / 6 / 0" counted Guardian as the 6th. With Guardian reframed as the
-wrapper, the honest count is 5 services. **Action item: open the actual deck file and count the
-tiles on the relevant slide before demo day** — don't leave this as a documented tension; pick
-one number and make every surface (deck, script, this doc, the UI) match it.)*
-
 ---
 
-## 10. Voice & tone (how CareKaki should always feel)
+## 11. Voice & tone (how CareKaki should always feel)
 
-- **Warm, human, reassuring** — it is a "care buddy," not a bureaucratic tool. ("Okay, that sounds stressful." / "I've been so worried." / "I'll keep you in the loop.")
+- **Warm, human, reassuring** — it is a "care buddy," not a bureaucratic tool.
 - **Plain language** — no jargon thrown at the family; acronyms are handled *for* them, never *at* them.
 - **Confident but honest** — it acts decisively (Autopilot) yet always keeps a human reachable and never over-claims (no medical advice).
 - **Personalised, never generic** — everything ties back to *this* family's actual context.
+- **Audio Guide extends this** — the voice sounds like a calm care companion, not a robot or a formal doctor.
 
 ---
 
-*Anchors:* the pitch deck (`CareKaki_Demo_Deck`) and the demo script
-(`docs/CareKaki_Demo_Script.md`). If any future work conflicts with the product intent
-captured here, this document wins unless deliberately and explicitly revised.
+## 12. Tech stack summary
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Frontend | Next.js 16 + React 19 + Tailwind 4 | Modern SSR, fast iteration |
+| Backend | FastAPI (Python) | Lightweight, async, perfect for LLM orchestration |
+| LLM | OpenAI GPT-4o-mini | Fast, cheap, JSON-mode, reliable rate limits |
+| Voice | ElevenLabs (TTS) + Web Speech API (STT) | Natural voice, browser-native mic |
+| Messaging | Telegram Bot API (2 bots) | Instant bot creation, real webhooks |
+| Maps | Leaflet + OpenStreetMap | Free, no API key |
+| Data | SG open data (HSA, CHAS, Eldercare GeoJSON) + openFDA | Real government data |
+| Infra | Docker Compose + ngrok | Containerised, webhook tunnel |
+
+---
+
+*This document reflects the actual running prototype as of 23 Jun 2026.
+When any future work conflicts with the product intent captured here, this document wins
+unless deliberately and explicitly revised.*

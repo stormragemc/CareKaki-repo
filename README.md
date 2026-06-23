@@ -43,6 +43,22 @@ Every AI output passes through **Guardian**, a Responsible-AI layer that redacts
 - **Living Care Profile** — fields light up in real time as the conversation reveals them, marked as MyInfo-verified or chat-assembled.
 - **Personalised Pathway** — a 4-column plan (`This Week` → `Weeks 2–8` → `Apply Now` → `Single Point of Contact`), where every item traces back to a fact about *you*.
 - **Autopilot** — approve the plan and watch 5 agents execute simultaneously in a live "machine-world" dashboard, wrapped end-to-end by Guardian.
+- **Audio Guide** — optional voice layer: ElevenLabs narrates each step in a warm, human tone; the mic button lets you speak instead of type on chat, pathway, autopilot, and care-brief pages.
+
+---
+
+## Audio Guide — voice layer
+
+CareKaki includes an optional **Audio Guide** that turns the journey into a spoken walkthrough. Toggle it from the header on any page.
+
+| Direction | Technology | What it does |
+|-----------|------------|--------------|
+| **Output (TTS)** | ElevenLabs (`eleven_multilingual_v2`) | Backend generates a short script via GPT-4o-mini, converts it to MP3, and the frontend plays it with Speaking / Listening / Ready status |
+| **Input (STT)** | Web Speech API (browser-native) | Mic captures speech and routes it to the current page — chat messages, care-plan edits, autopilot approval ("go ahead"), or care-brief questions |
+
+The voice **narrates what CareKaki is already doing** — it never makes independent decisions or calls adapters directly. Page events (plan created, autopilot ready, profile updated, etc.) trigger contextual narration via `POST /voice/speak`. Mic input auto-mutes while the AI is speaking; route changes stop all audio.
+
+Set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in `.env` for spoken output. Without them, the guide still generates scripts but stays silent.
 
 ---
 
@@ -71,9 +87,13 @@ Every agent output is filtered before it reaches a human:
 
 ```mermaid
 flowchart LR
-    U["Caregiver / Senior"] -->|chat & approve| WEB["Next.js Web<br/>(UI + Living Profile)"]
+    U["Caregiver / Senior"] -->|chat, speak & approve| WEB["Next.js Web<br/>(UI + Living Profile<br/>+ Audio Guide)"]
     WEB -->|REST| API["FastAPI Backend"]
-    API --> LLM["OpenAI<br/>chat · extraction · pathway"]
+    WEB -.->|mic input| STT["Web Speech API<br/>(browser STT)"]
+    STT -.->|transcript| WEB
+    API --> LLM["OpenAI GPT-4o-mini<br/>chat · extraction · pathway<br/>· voice scripts"]
+    API -->|POST /voice/speak| EL["ElevenLabs<br/>text-to-speech"]
+    EL -.->|MP3| API
     API --> GUARD["Guardian<br/>PDPA · medical · human-gate"]
     API --> ADP["Autopilot Adapters<br/>AIC · Nursing · Medication"]
     API <-->|webhooks| TG["Telegram Bots<br/>caregiver + ICCP coordinator"]
@@ -81,7 +101,7 @@ flowchart LR
     TG -.->|delivers updates| NGROK
 ```
 
-The backend degrades gracefully: **with no API keys at all it still boots** and serves synthetic/demo data — Guardian, health, and the rule-based emergency/adapter routing all work offline. LLM replies and live Telegram simply switch off.
+The backend degrades gracefully: **with no API keys at all it still boots** and serves synthetic/demo data — Guardian, health, and the rule-based emergency/adapter routing all work offline. LLM replies, live Telegram, and ElevenLabs audio simply switch off (Audio Guide falls back to script-only or silent).
 
 ## Tech stack
 
@@ -89,6 +109,7 @@ The backend degrades gracefully: **with no API keys at all it still boots** and 
 |-------|------|
 | **Frontend** | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · Leaflet / react-leaflet |
 | **Backend** | FastAPI · Python 3.11 · Pydantic · OpenAI (`gpt-4o-mini`) · pandas |
+| **Voice** | ElevenLabs (text-to-speech) · Web Speech API (browser speech-to-text) |
 | **Messaging** | Telegram Bot API (caregiver + ICCP coordinator bots) |
 | **Infra** | Docker Compose · ngrok (webhook tunnel) |
 | **Data** | CHAS Clinics · Eldercare Services (geojson) · HSA Registered Therapeutic Products · openFDA |
@@ -111,7 +132,9 @@ cp .env.example .env              # fill in keys (all optional)
 uvicorn main:app --reload --port 8000   # → http://localhost:8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and pick a mode to begin.
+Optional keys for full functionality: `OPENAI_API_KEY` (chat/pathway), `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` (Audio Guide narration), `TELEGRAM_BOT_TOKEN` / `ICCP_BOT_TELEGRAM_TOKEN` (live bots).
+
+Open [http://localhost:3000](http://localhost:3000) and pick a mode to begin. Enable **Audio Guide** in the header to hear step-by-step narration; use the mic button to speak on chat and later pages.
 
 ### Option B — Docker (recommended)
 
@@ -157,16 +180,17 @@ In Telegram, send `/start` to the caregiver bot and `/coordinator` in your ICCP 
 ```
 CareKaki-repo/
 ├── app/                  # Next.js routes (landing, onboard, chat, pathway, autopilot, handover…)
-├── components/           # UI: chat, pathway board, autopilot feeds, Guardian band
-├── hooks/                # useChatState — talks to the backend
+├── components/           # UI: chat, pathway board, autopilot feeds, Guardian band, AudioGuide
+├── contexts/             # AudioGuideContext — global voice state + mic routing
+├── hooks/                # useChatState, useAudioGuide, useVoiceEvent
 ├── lib/                  # shared types, session, demo users
 ├── backend/
-│   ├── main.py           # FastAPI app: chat, pathway, autopilot, Telegram webhooks
-│   ├── services/         # guardian + AIC / nursing / medication adapters
+│   ├── main.py           # FastAPI app: chat, pathway, autopilot, voice, Telegram webhooks
+│   ├── services/         # guardian, voice_guide, AIC / nursing / medication adapters
 │   ├── data/             # CHAS clinics, eldercare services, HSA registry
 │   └── tests/            # pytest suite
 ├── docker-compose.yml    # web + backend (+ ngrok via --profile webhook)
-└── .env.example          # root env for Docker
+└── .env.example          # root env for Docker (incl. ElevenLabs keys)
 ```
 
 ## Tests

@@ -13,12 +13,12 @@ export default function TalkToHuman({
       : "border-hairline-warm text-ink-body hover:bg-cream-deep";
 
   return (
-    <button
-      type="button"
+    <a
+      href="mailto:marceldan67@gmail.com?subject=CareKaki%20Support%20Request&body=Hi%2C%20I%20need%20help%20with%20CareKaki."
       className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${ring}`}
     >
       <Headset size={16} aria-hidden="true" />
       Talk to a human
-    </button>
+    </a>
   );
 }

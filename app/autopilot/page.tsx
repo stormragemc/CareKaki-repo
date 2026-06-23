@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, X } from "lucide-react";
 import Logo from "@/components/ui/Logo";
@@ -10,8 +10,11 @@ import GuardianBand from "@/components/ui/GuardianBand";
 import FlowStepper from "@/components/ui/FlowStepper";
 import AgentWorkspace, { resolveActivePanelIds } from "@/components/autopilot/AgentWorkspace";
 import { loadDemoUser, loadCareProfile } from "@/lib/session";
+import { useVoiceEvent } from "@/hooks/useVoiceEvent";
+import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
 
 export default function AutopilotPage() {
+  const guide = useAudioGuideCtx();
   const [name, setName] = useState("");
   const [approved, setApproved] = useState(false);
   // Count reflects the services this case actually needs, not a fixed 5.
@@ -30,6 +33,54 @@ export default function AutopilotPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setServiceCount(resolveActivePanelIds().length);
   }, []);
+
+  // Voice: explain autopilot actions before approval (wait for name to load)
+  const panelIds = resolveActivePanelIds();
+  const panelNames = panelIds.join(", ");
+  const { refire: refireExplanation } = useVoiceEvent(
+    "autopilot_explanation",
+    `Services planned: ${panelNames}. For ${name || "the patient"}.`,
+    [],
+    { skipInitial: true },
+  );
+
+  // Fire voice once data is resolved (useEffect runs after mount)
+  const voiceFiredRef = useRef(false);
+  useEffect(() => {
+    if (voiceFiredRef.current) return;
+    voiceFiredRef.current = true;
+    // Small delay to let sessionStorage reads settle
+    const t = setTimeout(() => {
+      const resolvedName = name || "the patient";
+      refireExplanation(`Services planned: ${panelNames}. For ${resolvedName}.`);
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, serviceCount]);
+
+  const approvedByVoiceRef = useRef(false);
+
+  // Register voice input: speech → approve/ask/change + voice reply
+  useEffect(() => {
+    guide.registerVoiceInput((transcript: string) => {
+      if (!transcript.trim()) return;
+      const lower = transcript.toLowerCase();
+
+      const isApprove = ["approve", "go ahead", "yes", "confirm", "run it", "do it", "proceed"].some(
+        (w) => lower.includes(w)
+      );
+
+      if (isApprove && !approved) {
+        approvedByVoiceRef.current = true;
+        setApproved(true);
+      }
+
+      // Single voice reply — covers both approval acknowledgment and questions
+      guide.speak("voice_input_autopilot", transcript);
+    });
+    return () => guide.unregisterVoiceInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guide.enabled, approved]);
 
   // Fallback so the nudge always appears in the demo: ~18s after approval.
   useEffect(() => {
@@ -142,7 +193,13 @@ export default function AutopilotPage() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => setApproved(true)}
+                  onClick={() => {
+                    setApproved(true);
+                    if (guide.enabled && !approvedByVoiceRef.current) {
+                      guide.speak("autopilot_approved");
+                    }
+                    approvedByVoiceRef.current = false;
+                  }}
                   className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-full bg-self px-7 text-base font-semibold text-white transition-colors hover:bg-self-ink"
                 >
                   Approve all

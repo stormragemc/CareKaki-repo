@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { ArrowRight } from "lucide-react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import LiveCareProfile from "@/components/chat/LiveCareProfile";
@@ -10,6 +10,7 @@ import ModeChip from "@/components/ui/ModeChip";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import FlowStepper from "@/components/ui/FlowStepper";
 import { useChatState } from "@/hooks/useChatState";
+import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
 
 const planButtonFill: Record<"self" | "caregiver", string> = {
   self: "bg-self",
@@ -21,6 +22,8 @@ function ChatPageInner() {
   const mode = searchParams.get("mode") === "self" ? "self" : "caregiver";
   const router = useRouter();
 
+  const guide = useAudioGuideCtx();
+
   const {
     messages,
     profile,
@@ -31,6 +34,27 @@ function ChatPageInner() {
     sendMessage,
     emergency,
   } = useChatState();
+
+  // Register voice input → sends as chat message
+  useEffect(() => {
+    guide.registerVoiceInput((transcript: string) => {
+      if (transcript.trim()) {
+        sendMessage(transcript);
+      }
+    });
+    return () => guide.unregisterVoiceInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendMessage]);
+
+  // Voice: announce when profile gets updated (skip the initial render)
+  const profileUpdateCount = useRef(0);
+  useEffect(() => {
+    profileUpdateCount.current += 1;
+    if (profileUpdateCount.current > 1 && guide.enabled && profile.name) {
+      guide.speak("profile_updated", profile.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
 
   useEffect(() => {
     if (emergency) {

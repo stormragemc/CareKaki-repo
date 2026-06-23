@@ -1,22 +1,26 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useAudioGuide } from "@/hooks/useAudioGuide";
 
 type AudioGuideReturn = ReturnType<typeof useAudioGuide>;
 
-const AudioGuideContext = createContext<AudioGuideReturn | null>(null);
+interface AudioGuideContextValue extends AudioGuideReturn {
+  registerVoiceInput: (cb: (transcript: string) => void) => void;
+  unregisterVoiceInput: () => void;
+  handleVoiceInput: (transcript: string) => void;
+}
+
+const AudioGuideContext = createContext<AudioGuideContextValue | null>(null);
 
 export function AudioGuideProvider({ children }: { children: ReactNode }) {
   const guide = useAudioGuide();
   const pathname = usePathname();
   const firstRender = useRef(true);
   const { stopAudio } = guide;
+  const voiceInputCb = useRef<((transcript: string) => void) | null>(null);
 
-  // Cut off any audio still playing from the previous page on navigation. This
-  // runs after the new page's mount effects, so a page that narrates itself
-  // (its speak() is still mid-fetch) isn't interrupted — only stale audio is.
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -25,14 +29,28 @@ export function AudioGuideProvider({ children }: { children: ReactNode }) {
     stopAudio();
   }, [pathname, stopAudio]);
 
+  const registerVoiceInput = useCallback((cb: (transcript: string) => void) => {
+    voiceInputCb.current = cb;
+  }, []);
+
+  const unregisterVoiceInput = useCallback(() => {
+    voiceInputCb.current = null;
+  }, []);
+
+  const handleVoiceInput = useCallback((transcript: string) => {
+    if (voiceInputCb.current) {
+      voiceInputCb.current(transcript);
+    }
+  }, []);
+
   return (
-    <AudioGuideContext.Provider value={guide}>
+    <AudioGuideContext.Provider value={{ ...guide, registerVoiceInput, unregisterVoiceInput, handleVoiceInput }}>
       {children}
     </AudioGuideContext.Provider>
   );
 }
 
-export function useAudioGuideCtx(): AudioGuideReturn {
+export function useAudioGuideCtx(): AudioGuideContextValue {
   const ctx = useContext(AudioGuideContext);
   if (!ctx) throw new Error("useAudioGuideCtx must be used inside AudioGuideProvider");
   return ctx;

@@ -57,6 +57,12 @@ EVENT_PROMPTS: dict[str, str] = {
     "autopilot_completed": "All autopilot actions finished. Say something short like 'Done, everything's been handled.' — 1 sentence.",
 
     "care_brief_ready": "The care brief is ready. Summarize it in 2-3 sentences: what happened, what was done, and what the next step is. Details: {context}. Sound like a calm handover.",
+
+    "voice_input_pathway": "The user is on the care plan page and said: \"{context}\". They're trying to edit or ask about the care plan. Respond in 1-2 sentences: acknowledge what they said, confirm you're making the change, or answer their question briefly. If they want to change something, say you're updating the plan. If it's a question, answer simply.",
+
+    "voice_input_autopilot": "The user is on the autopilot page and said: \"{context}\". They might be approving actions, asking what's happening, or requesting changes. Respond in 1-2 sentences. If they say 'approve' or 'go ahead' or 'yes', confirm you're running everything. If they ask a question, answer briefly. If they want to skip or change something, acknowledge it.",
+
+    "voice_input_care_brief": "The user is on the care brief page and said: \"{context}\". They might be asking about the brief, requesting changes, or asking what to do next. Respond in 1-2 sentences. Keep it calm and helpful. If they ask 'what now' or 'what's next', summarize the next steps simply.",
 }
 
 

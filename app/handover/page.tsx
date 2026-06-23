@@ -21,6 +21,7 @@ import FlowStepper from "@/components/ui/FlowStepper";
 import { loadDemoUser, loadCareProfile, deriveMode } from "@/lib/session";
 import { getPhase, getLastPhaseRecord, advancePhase, type PhaseRecord } from "@/lib/care-cycle";
 import { useVoiceEvent } from "@/hooks/useVoiceEvent";
+import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
 import type { CareMode, CareProfile } from "@/lib/types";
 
 interface LiveBrief {
@@ -42,8 +43,20 @@ export default function HandoverPage() {
   const [phase, setPhase] = useState(1);
   const [lastPhase, setLastPhase] = useState<PhaseRecord | null>(null);
 
+  const guide = useAudioGuideCtx();
+
   // Narrate the brief when the audio guide is on (calm "handover" summary).
-  const { refire } = useVoiceEvent("care_brief_ready");
+  const { refire } = useVoiceEvent("care_brief_ready", "", [], { skipInitial: true });
+
+  // Register voice input: speech → ask about the brief + voice reply
+  useEffect(() => {
+    guide.registerVoiceInput((transcript: string) => {
+      if (!transcript.trim()) return;
+      guide.speak("voice_input_care_brief", transcript);
+    });
+    return () => guide.unregisterVoiceInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guide.enabled]);
 
   useEffect(() => {
     const user = loadDemoUser();

@@ -10,6 +10,8 @@ import FlowStepper from "@/components/ui/FlowStepper";
 import type { CareMode, CareProfile, PathwayItem } from "@/lib/types";
 import type { PhaseRecord } from "@/lib/care-cycle";
 import type { DemoUser } from "@/lib/demo-users";
+import { useVoiceEvent } from "@/hooks/useVoiceEvent";
+import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
 
 // Session values are read-once and never mutate during a visit, so the
 // subscription is a no-op; useSyncExternalStore keeps the client read off the
@@ -84,7 +86,38 @@ export default function PathwayPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [editing, setEditing] = useState(false);
+  const editFromVoiceRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const guide = useAudioGuideCtx();
+
+  // Voice: announce care plan on first load
+  const planSummary = items.map((it) => it.title).join(", ");
+  useVoiceEvent("care_plan_created", `Plan for ${patientName || "the patient"}: ${planSummary}`);
+
+  // Register voice input: speech → edit the care plan + voice reply
+  useEffect(() => {
+    guide.registerVoiceInput((transcript: string) => {
+      if (!transcript.trim()) return;
+      const lower = transcript.toLowerCase();
+
+      // If it sounds like an edit, send it through the editor
+      const isEdit = ["remove", "add", "change", "update", "make", "skip", "don't", "move"].some(
+        (w) => lower.includes(w)
+      );
+
+      if (isEdit) {
+        editFromVoiceRef.current = true;
+        setChatOpen(true);
+        sendEdit(transcript);
+      }
+
+      // Voice reply — this is the only audio that plays for voice input
+      guide.speak("voice_input_pathway", transcript);
+    });
+    return () => guide.unregisterVoiceInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guide.enabled, items, mode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,6 +131,9 @@ export default function PathwayPage() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text: feedback }]);
     setEditing(true);
+    const fromVoice = editFromVoiceRef.current;
+    editFromVoiceRef.current = false;
+    if (guide.enabled && !fromVoice) guide.speak("care_plan_edit_requested");
     try {
       const res = await fetch("http://localhost:8000/pathway/edit-items", {
         method: "POST",
@@ -106,6 +142,7 @@ export default function PathwayPage() {
       });
       const data = await res.json();
       setEditedItems((data.items ?? items) as PathwayItem[]);
+      if (guide.enabled && !fromVoice) guide.speak("care_plan_edit_done");
       setMessages((prev) => [
         ...prev,
         {

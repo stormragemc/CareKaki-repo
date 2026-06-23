@@ -85,17 +85,17 @@ export default function AudioGuideToggle({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${base}`}>
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${base}`}>
         {/* Status dot + label */}
-        <div className="flex items-center gap-1.5 pl-0.5">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
-          <span className={`text-[11px] font-medium ${dark ? "text-white/70" : "text-gray-600"}`}>
+        <div className="flex items-center gap-2 pl-0.5">
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+          <span className={`text-sm font-medium ${dark ? "text-white/70" : "text-gray-600"}`}>
             {STATUS_LABELS[status] || status}
           </span>
         </div>
 
         {/* Divider */}
-        <span className={`w-px h-3.5 mx-0.5 ${dark ? "bg-white/10" : "bg-gray-200"}`} aria-hidden="true" />
+        <span className={`w-px h-5 mx-1 ${dark ? "bg-white/10" : "bg-gray-200"}`} aria-hidden="true" />
 
         {/* Mic toggle — always visible so state is always apparent */}
         <button
@@ -103,12 +103,12 @@ export default function AudioGuideToggle({
           disabled={status === "speaking"}
           aria-label={micLabel}
           title={micLabel}
-          className={`flex items-center justify-center w-6 h-6 rounded-md transition-all disabled:opacity-30 ${micActiveStyle}`}
+          className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all disabled:opacity-30 ${micActiveStyle}`}
         >
           {micOn ? (
-            <Mic size={13} aria-hidden="true" />
+            <Mic size={16} aria-hidden="true" />
           ) : (
-            <MicOff size={13} aria-hidden="true" />
+            <MicOff size={16} aria-hidden="true" />
           )}
         </button>
 
@@ -116,29 +116,29 @@ export default function AudioGuideToggle({
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? "Collapse controls" : "Expand controls"}
-          className={`flex items-center justify-center w-5 h-5 rounded text-[10px] transition-colors ${muted} ${hoverBg}`}
+          className={`flex items-center justify-center w-7 h-7 rounded-lg text-sm transition-colors ${muted} ${hoverBg}`}
         >
           {expanded ? "‹" : "›"}
         </button>
 
         {/* Secondary controls: pause/resume + stop */}
         {expanded && (
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={status === "paused" ? onResume : onPause}
               aria-label={status === "paused" ? "Resume audio" : "Pause audio"}
               title={status === "paused" ? "Resume" : "Pause"}
-              className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors ${hoverBg} ${muted}`}
+              className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${hoverBg} ${muted}`}
             >
-              {status === "paused" ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
+              {status === "paused" ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
             </button>
             <button
               onClick={onDisable}
               aria-label="Stop Audio Guide"
               title="Stop Audio Guide"
-              className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors ${hoverBg} ${muted}`}
+              className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${hoverBg} ${muted}`}
             >
-              <Square size={12} aria-hidden="true" />
+              <Square size={14} aria-hidden="true" />
             </button>
           </div>
         )}

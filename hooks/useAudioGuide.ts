@@ -18,7 +18,7 @@ interface SpeechRecognitionResultEventLike {
 }
 
 interface SpeechRecognitionErrorEventLike {
-  error: string; // e.g. "not-allowed", "no-speech", "network", "service-not-allowed"
+  error: string;
 }
 
 interface SpeechRecognitionLike {
@@ -45,6 +45,9 @@ export function useAudioGuide() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speakAbortRef = useRef<AbortController | null>(null);
+  const speakLockRef = useRef(false);
+  const lastSpeakTimeRef = useRef(0);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -54,31 +57,58 @@ export function useAudioGuide() {
     setState((s) => ({ ...s, micOn: false, micError: null }));
   }, []);
 
-  // Hard-stop whatever's currently playing (used on route changes) without
-  // turning the guide off — so the next page can narrate its own content.
-  const stopAudio = useCallback(() => {
+  const cancelCurrentAudio = useCallback(() => {
+    // Abort any in-flight fetch
+    if (speakAbortRef.current) {
+      speakAbortRef.current.abort();
+      speakAbortRef.current = null;
+    }
+    // Stop any playing audio
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.onended = null;
       audioRef.current = null;
     }
+    speakLockRef.current = false;
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    cancelCurrentAudio();
     stopListening();
     setState((s) => ({ ...s, status: s.enabled ? "idle" : "off" }));
-  }, [stopListening]);
+  }, [cancelCurrentAudio, stopListening]);
 
   const speak = useCallback(
     async (event: string, context: string = "", mode: string = "caregiver") => {
+      // Debounce: ignore calls within 500ms of the last one
+      const now = Date.now();
+      if (now - lastSpeakTimeRef.current < 500) return;
+      lastSpeakTimeRef.current = now;
+
+      // Cancel anything currently playing
+      cancelCurrentAudio();
       stopListening();
       setState((s) => ({ ...s, status: "speaking", micOn: false }));
+
+      const abortController = new AbortController();
+      speakAbortRef.current = abortController;
+      speakLockRef.current = true;
 
       try {
         const res = await fetch("http://localhost:8000/voice/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ event, context, mode }),
+          signal: abortController.signal,
         });
+
+        // If another speak() cancelled us, bail
+        if (!speakLockRef.current) return;
 
         if (res.headers.get("content-type")?.includes("audio")) {
           const blob = await res.blob();
+          if (!speakLockRef.current) return;
+
           const url = URL.createObjectURL(blob);
           const audio = new Audio(url);
           audioRef.current = audio;
@@ -89,6 +119,7 @@ export function useAudioGuide() {
           audio.onended = () => {
             URL.revokeObjectURL(url);
             audioRef.current = null;
+            speakLockRef.current = false;
             setState((s) => ({
               ...s,
               status: s.enabled ? "idle" : "off",
@@ -98,20 +129,24 @@ export function useAudioGuide() {
           await audio.play();
         } else {
           const data = await res.json();
+          speakLockRef.current = false;
           setState((s) => ({
             ...s,
             lastScript: data.script || "",
             status: s.enabled ? "idle" : "off",
           }));
         }
-      } catch {
+      } catch (err) {
+        // AbortError is expected when we cancel — don't treat as error
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        speakLockRef.current = false;
         setState((s) => ({
           ...s,
           status: s.enabled ? "idle" : "off",
         }));
       }
     },
-    [stopListening]
+    [cancelCurrentAudio, stopListening]
   );
 
   const enable = useCallback(() => {
@@ -119,26 +154,21 @@ export function useAudioGuide() {
     speak("guide_started", "", getMode());
   }, [speak]);
 
-  // Turn the guide on without the "welcome" line — used when a page wants to
-  // immediately narrate its own content (e.g. the tutorial "Read this aloud").
   const enableSilently = useCallback(() => {
     setState((s) => ({ ...s, enabled: true, status: "idle" }));
   }, []);
 
   const disable = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    cancelCurrentAudio();
     stopListening();
     setState({ enabled: false, status: "off", micOn: false, micError: null, lastScript: "" });
-  }, [stopListening]);
+  }, [cancelCurrentAudio, stopListening]);
 
   const pause = useCallback(() => {
-    if (audioRef.current) audioRef.current.pause();
+    cancelCurrentAudio();
     stopListening();
     setState((s) => ({ ...s, status: "paused", micOn: false }));
-  }, [stopListening]);
+  }, [cancelCurrentAudio, stopListening]);
 
   const resume = useCallback(() => {
     setState((s) => ({ ...s, status: "idle" }));
@@ -146,6 +176,7 @@ export function useAudioGuide() {
 
   const startListening = useCallback(
     (onResult: (transcript: string) => void) => {
+      // Don't start mic while speaking — wait for it to finish
       if (state.status === "speaking") return;
 
       const speechRecognitionWindow = window as typeof window & {
@@ -156,13 +187,9 @@ export function useAudioGuide() {
         speechRecognitionWindow.SpeechRecognition ||
         speechRecognitionWindow.webkitSpeechRecognition;
 
-      // Flip the button immediately so every click produces a visible response.
-      // If SR is unavailable or permission is denied, error handlers reset it back.
       setState((s) => ({ ...s, micOn: true, micError: null, status: "listening" }));
 
       if (!SpeechRecognition) {
-        // Browser doesn't support the API — show an error but stay in "on" state
-        // long enough for the user to see feedback, then reset.
         setState((s) => ({ ...s, micOn: false, micError: "unsupported" }));
         return;
       }
@@ -190,8 +217,6 @@ export function useAudioGuide() {
       };
 
       recognition.onend = () => {
-        // onend fires after both normal stop and after onerror; only clear micOn
-        // here — onerror already set micError if needed, so don't overwrite it.
         setState((s) => ({
           ...s,
           micOn: false,
@@ -203,7 +228,6 @@ export function useAudioGuide() {
       try {
         recognition.start();
       } catch {
-        // start() can throw synchronously if called while already active.
         recognitionRef.current = null;
         setState((s) => ({
           ...s,
@@ -228,7 +252,7 @@ export function useAudioGuide() {
   );
 
   return {
-    ...state, // includes micError
+    ...state,
     enable,
     enableSilently,
     disable,

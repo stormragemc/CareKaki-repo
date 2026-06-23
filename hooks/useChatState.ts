@@ -45,10 +45,13 @@ function loadInitialState(): {
   const profileStr = sessionStorage.getItem("careProfile");
   const profile = profileStr ? JSON.parse(profileStr) : emptyProfile;
 
+  const isSelf = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "self";
   const greeting: Message = {
     id: "1",
     role: "assistant",
-    content: "Hi — tell me about the person you're caring for. What just happened?",
+    content: isSelf
+      ? "Hi — tell me a bit about yourself. How are you feeling, and what's been going on?"
+      : "Hi — tell me about the person you're caring for. What just happened?",
   };
 
   return { messages: [greeting], profile, profileMeta: {} };

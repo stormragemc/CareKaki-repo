@@ -16,7 +16,7 @@ export default function AudioGuideButton({ theme = "light" }: { theme?: "light" 
       onDisable={guide.disable}
       onPause={guide.pause}
       onResume={guide.resume}
-      onToggleMic={() => guide.toggleMic(() => {})}
+      onToggleMic={() => guide.toggleMic(guide.handleVoiceInput)}
       theme={theme}
     />
   );

@@ -100,10 +100,10 @@ export default function AutopilotPage() {
             <Logo size={28} theme="dark" />
             <span className="flex flex-col leading-tight">
               <span className="font-serif font-semibold text-autopilot-text text-lg tracking-tight">
-                Autopilot
+                AiMao&apos;s Mind
               </span>
               <span className="text-xs text-autopilot-muted">
-                {serviceCount} {serviceCount === 1 ? "service" : "services"} {approved ? "running" : "drafted"} for {name}
+                expert view · {serviceCount} {serviceCount === 1 ? "process" : "processes"} {approved ? "running" : "drafted"} for {name}
               </span>
             </span>
           </Link>
@@ -123,8 +123,30 @@ export default function AutopilotPage() {
 
       <FlowStepper theme="dark" />
 
-      {/* Guardian wraps everything Autopilot runs, then the live workspace */}
+      {/* Guardian wraps everything AiMao runs, then the live workspace */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 overflow-hidden">
+        {/* How AiMao thinks — the pipeline behind the friendly face. Structured
+            system states only; never hidden chain-of-thought. */}
+        <div className="overflow-x-auto rounded-xl border border-autopilot-hairline bg-autopilot-card/60 px-4 py-2.5">
+          <ol className="flex min-w-max items-center gap-2 text-xs text-autopilot-muted">
+            {[
+              "Observation received",
+              "Signal extraction",
+              "Profile update",
+              "Baseline comparison",
+              "Change detection",
+              "Guardian validation",
+              "Care Brief",
+            ].map((step, i, arr) => (
+              <li key={step} className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 font-semibold ${approved ? "bg-autopilot-pill text-autopilot-text" : "bg-autopilot-band text-autopilot-muted"}`}>
+                  {step}
+                </span>
+                {i < arr.length - 1 && <span aria-hidden="true">→</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
         <GuardianBand theme="dark" count={serviceCount} />
         <div className="flex-1 overflow-hidden">
           <AgentWorkspace approved={approved} onAllPanelsViewed={() => setCycleReady(true)} />

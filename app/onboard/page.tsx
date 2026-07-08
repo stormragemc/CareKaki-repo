@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MapPin, Check } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import Link from "next/link";
+import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import { resetCycle } from "@/lib/care-cycle";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { CareMode } from "@/lib/types";
 
 const DEMO_LOCATION = {
@@ -21,6 +23,7 @@ function OnboardInner() {
   const searchParams = useSearchParams();
   const mode: CareMode = searchParams.get("mode") === "self" ? "self" : "caregiver";
 
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [step, setStep] = useState<"form" | "location">("form");
@@ -80,48 +83,47 @@ function OnboardInner() {
         {step === "form" && (
           <div className="w-full max-w-md flex flex-col gap-6">
             <div className="text-center">
+              <AiMaoCharacter expression="happy" variant="face" size="md" className="mb-3" />
               <p className={`text-xs font-bold tracking-widest uppercase mb-2 ${accentText}`}>
-                {mode === "self" ? "Senior Setup" : "Caregiver Setup"}
+                {mode === "self" ? t("onboard.seniorSetup") : t("onboard.caregiverSetup")}
               </p>
               <h1 className="font-serif font-bold text-3xl text-ink mb-2">
-                {mode === "self" ? "Let's get to know you" : "Who are you caring for?"}
+                {mode === "self" ? t("onboard.letsKnow") : t("onboard.whoCaring")}
               </h1>
-              <p className="text-base text-ink-soft">
-                CareKaki will use this to personalise your care plan.
-              </p>
+              <p className="text-base text-ink-soft">{t("onboard.aimaoUses")}</p>
             </div>
 
             {/* Name */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-ink-body">
-                {mode === "self" ? "Your name" : "Senior's name"}
+                {mode === "self" ? t("onboard.yourName") : t("onboard.seniorName")}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={mode === "self" ? "e.g. Mdm Tan" : "e.g. My mother, Mdm Tan"}
+                placeholder={mode === "self" ? t("onboard.namePlaceholderSelf") : t("onboard.namePlaceholderCg")}
                 className={`px-4 py-3 rounded-xl border border-hairline-warm bg-surface text-base text-ink placeholder-ink-faint outline-none transition-colors ${focusBorder}`}
               />
             </div>
 
             {/* Age */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-ink-body">Age</label>
+              <label className="text-sm font-semibold text-ink-body">{t("onboard.age")}</label>
               <input
                 type="number"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                placeholder="e.g. 78"
+                placeholder={t("onboard.agePlaceholder")}
                 className={`px-4 py-3 rounded-xl border border-hairline-warm bg-surface text-base text-ink placeholder-ink-faint outline-none transition-colors ${focusBorder}`}
               />
             </div>
 
             {/* Role indicator */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cream-deep border border-hairline">
-              <span className="text-[11px] text-ink-muted uppercase tracking-wider">Role</span>
+              <span className="text-[11px] text-ink-muted uppercase tracking-wider">{t("onboard.role")}</span>
               <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${accentTint}`}>
-                {mode === "self" ? "Senior" : "Caregiver"}
+                {mode === "self" ? t("onboard.senior") : t("onboard.caregiver")}
               </span>
             </div>
 
@@ -130,7 +132,7 @@ function OnboardInner() {
               onClick={handleFormSubmit}
               disabled={!name.trim() || !age.trim()}
             >
-              Continue
+              {t("onboard.cont")}
             </PrimaryButton>
           </div>
         )}
@@ -154,25 +156,22 @@ function OnboardInner() {
                         <MapPin size={22} aria-hidden="true" />
                       </div>
                       <div>
-                        <p className="text-base font-semibold text-ink">Allow location access?</p>
-                        <p className="text-sm text-ink-soft">CareKaki uses your location to find nearby services</p>
+                        <p className="text-base font-semibold text-ink">{t("onboard.allowLocation")}</p>
+                        <p className="text-sm text-ink-soft">{t("onboard.locationWhy")}</p>
                       </div>
                     </div>
 
-                    <p className="text-sm text-ink-muted mb-6 leading-relaxed">
-                      This helps us recommend eldercare centres, clinics, and home nursing providers near you.
-                      Your location is not stored or shared.
-                    </p>
+                    <p className="text-sm text-ink-muted mb-6 leading-relaxed">{t("onboard.locationHelp")}</p>
 
                     <div className="flex flex-col gap-2">
                       <PrimaryButton mode={mode} onClick={handleGrantLocation} className="w-full">
-                        Allow while using app
+                        {t("onboard.allowWhile")}
                       </PrimaryButton>
                       <button
                         onClick={finishOnboard}
                         className="w-full px-6 py-3 rounded-xl text-ink-soft text-base hover:text-ink transition-colors"
                       >
-                        Don&apos;t allow
+                        {t("onboard.dontAllow")}
                       </button>
                     </div>
                   </>
@@ -181,7 +180,7 @@ function OnboardInner() {
                     <div className="w-12 h-12 rounded-full bg-status-done-bg flex items-center justify-center text-status-done">
                       <Check size={24} aria-hidden="true" />
                     </div>
-                    <p className="text-base font-semibold text-ink">Location set</p>
+                    <p className="text-base font-semibold text-ink">{t("onboard.locationSet")}</p>
                     <p className="text-sm text-ink-soft">{DEMO_LOCATION.address}</p>
                   </div>
                 )}

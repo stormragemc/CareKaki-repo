@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // The four journey sections, in order. The stepper reads the current route so
 // every page shows "where you are" like the sections of a multi-step form.
 const STEPS = [
-  { key: "profile", label: "Care Profile", href: "/chat" },
-  { key: "plan", label: "Care Plan", href: "/pathway" },
-  { key: "autopilot", label: "Autopilot", href: "/autopilot" },
-  { key: "brief", label: "Care Brief", href: "/handover" },
+  { key: "profile", labelKey: "stepper.talk", href: "/chat" },
+  { key: "plan", labelKey: "stepper.plan", href: "/pathway" },
+  { key: "autopilot", labelKey: "stepper.arrange", href: "/autopilot" },
+  { key: "brief", labelKey: "stepper.brief", href: "/handover" },
 ] as const;
 
 const ROUTE_INDEX: Record<string, number> = {
@@ -34,6 +35,7 @@ export default function FlowStepper({
   className = "",
 }: FlowStepperProps) {
   const pathname = usePathname();
+  const { t } = useLanguage();
   const current = activeIndex ?? ROUTE_INDEX[pathname ?? ""] ?? -1;
 
   const dark = theme === "dark";
@@ -77,7 +79,7 @@ export default function FlowStepper({
                     active ? activeLabel : done ? "text-status-done" : upcomingLabel
                   } ${active ? "" : "hidden sm:inline"}`}
                 >
-                  {step.label}
+                  {t(step.labelKey)}
                 </span>
               </Link>
               {i < STEPS.length - 1 && (

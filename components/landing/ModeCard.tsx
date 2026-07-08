@@ -7,6 +7,7 @@ interface ModeCardProps {
   title: string;
   description: string;
   href: string;
+  ctaLabel?: string;
 }
 
 const config = {
@@ -30,7 +31,7 @@ const config = {
   },
 } satisfies Record<CareMode, unknown>;
 
-export default function ModeCard({ mode, title, description, href }: ModeCardProps) {
+export default function ModeCard({ mode, title, description, href, ctaLabel }: ModeCardProps) {
   const c = config[mode];
   const Icon = c.Icon;
 
@@ -51,7 +52,7 @@ export default function ModeCard({ mode, title, description, href }: ModeCardPro
         href={href}
         className={`mt-auto inline-flex min-h-[56px] items-center justify-center gap-2 rounded-xl text-base font-semibold text-white transition-colors active:scale-[0.99] ${c.cta}`}
       >
-        {c.ctaLabel}
+        {ctaLabel ?? c.ctaLabel}
         <ArrowRight size={18} aria-hidden="true" />
       </Link>
     </div>

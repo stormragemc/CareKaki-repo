@@ -104,6 +104,22 @@ navigate community care services. You ask short, empathetic questions to underst
 the patient's situation — their living arrangements, mobility, conditions, caregiver
 situation, and financial tier. Keep responses concise and conversational."""
 
+# Reply-language instructions, keyed by the frontend's language code. Brand and
+# scheme names (AiMao, CareKaki, Guardian, CHAS, MediFund, SingPass, ICCP…)
+# always stay in English.
+LANGUAGE_INSTRUCTIONS = {
+    "zh": "\n\nReply entirely in Simplified Chinese (简体中文), in a warm everyday tone. "
+          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and Singapore scheme names "
+          "(CHAS, MediFund, SingPass, ICCP) in English.",
+    "ms": "\n\nReply entirely in Bahasa Melayu, in a warm everyday tone. "
+          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and Singapore scheme names "
+          "(CHAS, MediFund, SingPass, ICCP) in English.",
+}
+
+
+def with_language(prompt: str, language: str) -> str:
+    return prompt + LANGUAGE_INSTRUCTIONS.get(language, "")
+
 EXTRACTION_PROMPT = """Extract any care profile fields you can confidently identify
 from this conversation. Return only a JSON object with these fields (omit fields you
 are not confident about):
@@ -188,6 +204,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[Message]
+    language: str = "en"
 
 
 class PathwayRequest(BaseModel):
@@ -249,7 +266,9 @@ def chat(request: ChatRequest):
         profile_update = {}
     else:
         # Main chat response
-        chat_messages = to_openai_messages(request.messages, SYSTEM_PROMPT)
+        chat_messages = to_openai_messages(
+            request.messages, with_language(SYSTEM_PROMPT, request.language)
+        )
         chat_resp = oai.chat.completions.create(
             model=CHAT_MODEL,
             messages=chat_messages,
@@ -778,6 +797,7 @@ class PathwayItemsEditRequest(BaseModel):
     items: list[dict]
     mode: str = "caregiver"
     feedback: str
+    language: str = "en"
 
 
 _PATHWAY_GROUPS = {"this-week", "weeks-2-8", "apply-now", "single-point"}
@@ -805,7 +825,7 @@ def pathway_edit_items(req: PathwayItemsEditRequest):
         return {"items": req.items, "edited": False}
 
     prompt = (
-        f"{PATHWAY_ITEMS_EDIT_PROMPT}\n\n"
+        f"{with_language(PATHWAY_ITEMS_EDIT_PROMPT, req.language)}\n\n"
         f"Care recipient mode: {req.mode}\n\n"
         f"Current plan:\n{json.dumps(req.items)}\n\n"
         f"Requested change:\n{safe_feedback}"
@@ -933,6 +953,7 @@ class VoiceEventRequest(BaseModel):
     event: str
     context: str = ""
     mode: str = "caregiver"
+    language: str = "en"
 
 
 # HTTP headers must be latin-1 encodable, but GPT scripts often contain smart
@@ -952,7 +973,7 @@ def _header_safe(text: str, limit: int = 200) -> str:
 
 @app.post("/voice/speak")
 def voice_speak(req: VoiceEventRequest):
-    script, audio = generate_voice_audio(req.event, req.context, req.mode)
+    script, audio = generate_voice_audio(req.event, req.context, req.mode, req.language)
     if audio:
         return Response(
             content=audio,
@@ -964,5 +985,5 @@ def voice_speak(req: VoiceEventRequest):
 
 @app.post("/voice/script")
 def voice_script(req: VoiceEventRequest):
-    script = generate_voice_script(req.event, req.context, req.mode)
+    script = generate_voice_script(req.event, req.context, req.mode, req.language)
     return {"script": script}

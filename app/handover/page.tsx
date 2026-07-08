@@ -13,8 +13,18 @@ import {
   History,
   ClipboardList,
   RefreshCw,
+  Printer,
+  Copy,
+  MessageCircleHeart,
+  TrendingDown,
+  HelpCircle,
 } from "lucide-react";
 import Logo from "@/components/ui/Logo";
+import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
+import AiMaoLive from "@/components/aimao/AiMaoLive";
+import { briefTraceability } from "@/lib/demoCareData";
+import { getCareData } from "@/lib/careData";
+import { useLanguage } from "@/contexts/LanguageContext";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import AudioGuideButton from "@/components/ui/AudioGuideButton";
 import FlowStepper from "@/components/ui/FlowStepper";
@@ -42,8 +52,12 @@ export default function HandoverPage() {
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState(1);
   const [lastPhase, setLastPhase] = useState<PhaseRecord | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const guide = useAudioGuideCtx();
+  const { lang, t } = useLanguage();
+  const { briefRecentChanges, briefTimeline, briefWhyFlagged, briefDiscussPoints } =
+    getCareData(lang);
 
   // Narrate the brief when the audio guide is on (calm "handover" summary).
   const { refire } = useVoiceEvent("care_brief_ready", "", [], { skipInitial: true });
@@ -116,12 +130,35 @@ export default function HandoverPage() {
     router.push("/pathway");
   };
 
+  const copyBrief = async () => {
+    if (!brief) return;
+    const text = [
+      `CARE BRIEF — ${brief.senior_name}${brief.age ? `, ${brief.age}` : ""}`,
+      "",
+      "Recent changes:",
+      ...briefRecentChanges.map((c) => `• ${c}`),
+      "",
+      "Situation: " + brief.situation,
+      "",
+      "Next steps:",
+      ...brief.next_steps.map((s) => `• ${s}`),
+      "",
+      `Based on ${briefTraceability.observations} caregiver observations and ${briefTraceability.daysOfHistory} days of activity history.`,
+      "Guardian-checked · PDPA scrubbed · no medical advice · human review required",
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
   if (loading || !brief) {
     return (
       <div className="min-h-screen bg-cream-deep flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <span className="w-2 h-2 bg-caregiver rounded-full animate-pulse" />
-          <span className="text-sm text-gray-500">Generating care brief…</span>
+        <div className="flex flex-col items-center gap-3">
+          <AiMaoLive base="thinking" size="md" />
+          <span className="text-base text-ink-soft">{t("brief.generating")}</span>
         </div>
       </div>
     );
@@ -131,21 +168,21 @@ export default function HandoverPage() {
 
   return (
     <div className="min-h-screen bg-cream-deep flex flex-col motion-safe:animate-ck-fade-in">
-      <header className="px-6 py-4 flex items-center justify-between">
+      <header className="print-hidden px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Logo size={28} />
           <span className="font-serif font-semibold text-ink text-lg tracking-tight">CareKaki</span>
         </Link>
         <div className="flex items-center gap-3">
           <Link href="/autopilot" className="text-sm text-ink-soft hover:text-ink transition-colors">
-            ← Autopilot
+            {t("brief.backToMind")}
           </Link>
           <Link
             href="/pathway"
             className="hidden items-center gap-1.5 rounded-full border border-hairline px-3.5 py-1.5 text-sm font-medium text-ink-body transition-colors hover:border-caregiver hover:text-caregiver sm:inline-flex"
           >
             <ClipboardList size={15} aria-hidden="true" />
-            Care Plan
+            {t("nav.carePlan")}
           </Link>
           <AudioGuideButton />
           <TalkToHuman />
@@ -159,20 +196,23 @@ export default function HandoverPage() {
         <article className="bg-surface rounded-[14px] shadow-[0_14px_40px_rgba(30,42,51,0.10)] overflow-hidden">
           {/* Letterhead */}
           <div className="flex flex-wrap items-end justify-between gap-3 px-7 sm:px-10 pt-9 pb-5 border-b-2 border-ink">
-            <div className="flex flex-col gap-1">
-              <span className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${eyebrow}`}>
-                Care Brief · CareKaki
-                <span className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted">
-                  Phase {phase}
+            <div className="flex items-end gap-4">
+              <AiMaoCharacter expression="idle" variant="face" size="sm" className="mb-1 shrink-0" />
+              <div className="flex flex-col gap-1">
+                <span className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${eyebrow}`}>
+                  {t("brief.eyebrow")}
+                  <span className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted">
+                    {t("brief.phase")} {phase}
+                  </span>
                 </span>
-              </span>
-              <h1 className="font-serif font-semibold text-3xl text-ink leading-tight">
-                {brief.senior_name}{brief.age ? `, ${brief.age}` : ""}
-              </h1>
+                <h1 className="font-serif font-semibold text-3xl text-ink leading-tight">
+                  {brief.senior_name}{brief.age ? `, ${brief.age}` : ""}
+                </h1>
+              </div>
             </div>
             <div className="text-right text-sm text-ink-soft leading-snug">
-              <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">Prepared for</p>
-              <p className="font-medium text-ink-body">Care Corner ICCP coordinator</p>
+              <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">{t("brief.preparedFor")}</p>
+              <p className="font-medium text-ink-body">{t("brief.coordinator")}</p>
               <p className="text-ink-muted">{brief.generated_at}</p>
             </div>
           </div>
@@ -185,22 +225,45 @@ export default function HandoverPage() {
                 <section className="flex flex-col gap-2 rounded-[14px] border border-hairline bg-tint p-4">
                   <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
                     <History size={14} className="shrink-0" aria-hidden="true" />
-                    What happened before · Phase {lastPhase.phase}
+                    {t("brief.before", { phase: lastPhase.phase })}
                   </h2>
                   <p className="text-sm leading-relaxed text-ink-body">{lastPhase.summary}</p>
                 </section>
               )}
 
+              {/* Recent changes — the early-warning heart of the brief */}
+              <section className="print-break-avoid flex flex-col gap-2.5 rounded-[14px] border border-drawer-orange/50 bg-drawer-orange-soft p-4">
+                <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-ink-body">
+                  <TrendingDown size={14} className="shrink-0 text-drawer-orange" aria-hidden="true" />
+                  {t("brief.recentChanges")}
+                </h2>
+                <ul className="flex flex-col gap-1.5">
+                  {briefRecentChanges.map((change) => (
+                    <li key={change} className="text-sm leading-relaxed text-ink-body">
+                      • {change}
+                    </li>
+                  ))}
+                </ul>
+                <ol className="mt-2 flex flex-col gap-1 border-t border-drawer-orange/30 pt-2.5">
+                  {briefTimeline.map(({ day, note }) => (
+                    <li key={day} className="flex items-baseline gap-3 text-sm">
+                      <span className="w-10 shrink-0 font-bold uppercase text-ink-muted">{day}</span>
+                      <span className="text-ink-body">{note}</span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
               {/* Situation */}
               <section className="flex flex-col gap-2">
-                <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">Situation</h2>
+                <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">{t("brief.situation")}</h2>
                 <p className="text-ink-body leading-relaxed">{brief.situation}</p>
               </section>
 
               {/* Actions taken by CareKaki */}
               <section className="flex flex-col gap-2.5">
                 <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
-                  Actions identified &amp; completed
+                  {t("brief.actionsDone")}
                   <span className="rounded-full bg-status-done-bg px-2 py-0.5 text-status-done">
                     {brief.actions_taken.length}
                   </span>
@@ -228,7 +291,7 @@ export default function HandoverPage() {
               {/* Recommended next steps — these seed the next care plan phase */}
               <section className="flex flex-col gap-2.5">
                 <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
-                  The next phase · what to do next
+                  {t("brief.nextPhase")}
                 </h2>
                 <ul className="flex flex-col gap-2">
                   {brief.next_steps.map((step, i) => (
@@ -243,10 +306,57 @@ export default function HandoverPage() {
 
             {/* Right column */}
             <div className="flex flex-col gap-4">
+              {/* Why AiMao flagged this — explainable, rules-based */}
+              <div className="print-break-avoid rounded-[14px] border border-aimao-teal/30 bg-aimao-teal-soft p-4">
+                <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-aimao-teal-ink">
+                  <HelpCircle size={14} className="shrink-0" aria-hidden="true" />
+                  {t("brief.whyFlagged")}
+                </h3>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {briefWhyFlagged.map((reason) => (
+                    <li key={reason} className="text-sm leading-relaxed text-ink-body">
+                      • {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* What may be useful to discuss */}
+              <div className="print-break-avoid rounded-[14px] border border-hairline bg-surface p-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
+                  {t("brief.usefulDiscuss")}
+                </h3>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {briefDiscussPoints.map((point) => (
+                    <li key={point} className="text-sm leading-relaxed text-ink-body">
+                      • {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Traceability */}
+              <div className="rounded-[14px] border border-hairline bg-tint p-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
+                  {t("brief.traceability")}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-body">
+                  {t("brief.traceBasedOn")}{" "}
+                  <span className="font-semibold">
+                    {t("brief.traceObservations", { n: briefTraceability.observations })}
+                  </span>{" "}
+                  {t("brief.traceAnd")}{" "}
+                  <span className="font-semibold">
+                    {t("brief.traceDays", { n: briefTraceability.daysOfHistory })}
+                  </span>
+                  . {t("brief.traceNote")}
+                </p>
+              </div>
+
               {/* Caregiver */}
               <div className="rounded-[14px] border border-hairline bg-tint p-4">
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
-                  Notified family / caregiver
+                  {t("brief.notified")}
                 </h3>
                 <p className="mt-1.5 text-ink-body">{brief.caregiver}</p>
               </div>
@@ -255,7 +365,7 @@ export default function HandoverPage() {
               <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-4">
                 <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
                   <AlertTriangle size={14} className="shrink-0" />
-                  Important notes
+                  {t("brief.importantNotes")}
                 </h3>
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {brief.important_notes.map((note, i) => (
@@ -270,20 +380,20 @@ export default function HandoverPage() {
               {/* Consents */}
               <div className="rounded-[14px] border border-hairline bg-surface p-4">
                 <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
-                  Consents on file
+                  {t("brief.consents")}
                 </h3>
                 <ul className="mt-2 flex flex-col gap-1.5">
                   <li className="flex items-start gap-2 text-sm text-ink-body">
                     <Check size={15} className="mt-0.5 shrink-0 text-live" aria-hidden="true" />
-                    <span>Guardian-checked — PDPA scrubbed</span>
+                    <span>{t("brief.consentPdpa")}</span>
                   </li>
                   <li className="flex items-start gap-2 text-sm text-ink-body">
                     <Check size={15} className="mt-0.5 shrink-0 text-live" aria-hidden="true" />
-                    <span>No medical advice given by system</span>
+                    <span>{t("brief.consentNoAdvice")}</span>
                   </li>
                   <li className="flex items-start gap-2 text-sm text-ink-body">
                     <Check size={15} className="mt-0.5 shrink-0 text-live" aria-hidden="true" />
-                    <span>Caregiver approved autopilot actions</span>
+                    <span>{t("brief.consentApproved")}</span>
                   </li>
                 </ul>
               </div>
@@ -293,25 +403,50 @@ export default function HandoverPage() {
           {/* Guardian footer */}
           <div className="flex items-center gap-2 border-t border-hairline bg-cream px-7 sm:px-10 py-4">
             <ShieldCheck size={18} className="shrink-0 text-live" aria-hidden="true" />
-            <span className="text-sm font-medium text-ink-soft">
-              Guardian-checked · PDPA scrubbed · no medical advice given · prototype care brief
-            </span>
+            <span className="text-sm font-medium text-ink-soft">{t("brief.guardianFooter")}</span>
           </div>
         </article>
 
+        {/* Share / act on the brief */}
+        <div className="print-hidden mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex min-h-[46px] items-center gap-1.5 rounded-full border border-hairline bg-surface px-5 text-sm font-semibold text-ink-body transition-colors hover:border-aimao-teal hover:text-aimao-teal"
+          >
+            <Printer size={16} aria-hidden="true" />
+            {t("brief.print")}
+          </button>
+          <button
+            type="button"
+            onClick={copyBrief}
+            className="inline-flex min-h-[46px] items-center gap-1.5 rounded-full border border-hairline bg-surface px-5 text-sm font-semibold text-ink-body transition-colors hover:border-aimao-teal hover:text-aimao-teal"
+          >
+            {copied ? <Check size={16} className="text-status-done" aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+            {copied ? t("brief.copied") : t("brief.copy")}
+          </button>
+          <Link
+            href="/chat"
+            className="inline-flex min-h-[46px] items-center gap-1.5 rounded-full bg-aimao-teal px-5 text-sm font-semibold text-white transition-colors hover:bg-aimao-teal-ink"
+          >
+            <MessageCircleHeart size={16} aria-hidden="true" />
+            {t("brief.reviewWithAiMao")}
+          </Link>
+          <p className="ml-1 text-xs text-ink-muted">{t("brief.youControl")}</p>
+        </div>
+
         {/* Continue the care cycle */}
-        <div className="mt-6 flex flex-col gap-4 rounded-[14px] border border-caregiver-border bg-caregiver-soft p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="print-hidden mt-6 flex flex-col gap-4 rounded-[14px] border border-caregiver-border bg-caregiver-soft p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-caregiver/15 text-caregiver">
               <RefreshCw size={20} aria-hidden="true" />
             </span>
             <div className="flex flex-col gap-0.5">
               <p className="font-serif text-lg font-semibold text-caregiver-ink">
-                Continue the care cycle
+                {t("brief.cycleTitle")}
               </p>
               <p className="text-sm leading-relaxed text-ink-body">
-                Care doesn&apos;t stop here. Start Phase {phase + 1} — the next steps above
-                become a fresh plan, and everything from this phase carries forward.
+                {t("brief.cycleText", { phase: phase + 1 })}
               </p>
             </div>
           </div>
@@ -321,14 +456,14 @@ export default function HandoverPage() {
               className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-full border border-hairline bg-surface px-5 text-sm font-semibold text-ink-body transition-colors hover:border-caregiver hover:text-caregiver"
             >
               <ClipboardList size={16} aria-hidden="true" />
-              View care plan
+              {t("brief.viewCarePlan")}
             </Link>
             <button
               type="button"
               onClick={beginNextPhase}
               className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-full bg-caregiver px-6 text-sm font-semibold text-white transition-colors hover:bg-caregiver-ink"
             >
-              Begin Phase {phase + 1} plan
+              {t("brief.beginPhase", { phase: phase + 1 })}
               <ArrowRight size={16} aria-hidden="true" />
             </button>
           </div>

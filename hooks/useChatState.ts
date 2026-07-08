@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { currentLang, translate } from "@/lib/i18n";
 import type { Message, CareProfile, ProfileMeta } from "@/lib/types";
 
 const emptyProfile: CareProfile = {
@@ -49,9 +50,7 @@ function loadInitialState(): {
   const greeting: Message = {
     id: "1",
     role: "assistant",
-    content: isSelf
-      ? "Hi — tell me a bit about yourself. How are you feeling, and what's been going on?"
-      : "Hi — tell me about the person you're caring for. What just happened?",
+    content: translate(currentLang(), isSelf ? "chat.greetingSelf" : "chat.greetingCaregiver"),
   };
 
   return { messages: [greeting], profile, profileMeta: {} };
@@ -120,7 +119,9 @@ export function useChatState() {
       const res = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: messagePayload }),
+        // language: the LLM replies in the user's chosen language (AiMao and
+        // CareKaki stay untranslated by the backend prompt).
+        body: JSON.stringify({ messages: messagePayload, language: currentLang() }),
       });
       const data = await res.json();
       const assistantMsg: Message = {
@@ -152,7 +153,7 @@ export function useChatState() {
       const errorMsg: Message = {
         id: String(Date.now() + 1),
         role: "assistant",
-        content: "Sorry, I couldn't reach the backend. Is the server running?",
+        content: translate(currentLang(), "chat.backendError"),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {

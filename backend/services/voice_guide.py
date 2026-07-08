@@ -66,7 +66,17 @@ EVENT_PROMPTS: dict[str, str] = {
 }
 
 
-def generate_voice_script(event: str, context: str = "", mode: str = "caregiver") -> str:
+# Spoken-language instructions. Brand names (AiMao, CareKaki, Guardian) and
+# Singapore scheme names stay in English; ElevenLabs multilingual voices the rest.
+VOICE_LANGUAGE_INSTRUCTIONS = {
+    "zh": "\nWrite the script entirely in Simplified Chinese (简体中文), warm and simple. "
+          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and scheme names (CHAS, MediFund, SingPass) in English.",
+    "ms": "\nWrite the script entirely in Bahasa Melayu, warm and simple. "
+          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and scheme names (CHAS, MediFund, SingPass) in English.",
+}
+
+
+def generate_voice_script(event: str, context: str = "", mode: str = "caregiver", language: str = "en") -> str:
     prompt_template = EVENT_PROMPTS.get(event)
     if not prompt_template:
         return ""
@@ -74,6 +84,7 @@ def generate_voice_script(event: str, context: str = "", mode: str = "caregiver"
     prompt = prompt_template.replace("{context}", context)
     if mode == "self":
         prompt += "\nThe user is an elderly person — be extra simple, gentle, and reassuring."
+    prompt += VOICE_LANGUAGE_INSTRUCTIONS.get(language, "")
 
     if not _oai:
         return prompt
@@ -114,8 +125,8 @@ def text_to_speech(text: str) -> bytes | None:
     return None
 
 
-def generate_voice_audio(event: str, context: str = "", mode: str = "caregiver") -> tuple[str, bytes | None]:
-    script = generate_voice_script(event, context, mode)
+def generate_voice_audio(event: str, context: str = "", mode: str = "caregiver", language: str = "en") -> tuple[str, bytes | None]:
+    script = generate_voice_script(event, context, mode, language)
     if not script:
         return "", None
     audio = text_to_speech(script)

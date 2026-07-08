@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUp } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { CareMode } from "@/lib/types";
 
 interface ChatInputProps {
@@ -17,6 +18,7 @@ const sendFill: Record<CareMode, string> = {
 };
 
 export default function ChatInput({ value, onChange, onSend, mode, disabled }: ChatInputProps) {
+  const { t } = useLanguage();
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -31,7 +33,7 @@ export default function ChatInput({ value, onChange, onSend, mode, disabled }: C
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type your reply…"
+        placeholder={t("chat.placeholder")}
         disabled={disabled}
         className="flex-1 bg-transparent text-base text-ink-body placeholder:text-ink-muted outline-none disabled:opacity-50"
         aria-label="Chat message input"

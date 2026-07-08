@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronUp } from "lucide-react";
 import type { CareMode, CareProfile, ProfileMeta } from "@/lib/types";
 import ProfileFieldCard from "@/components/ui/ProfileFieldCard";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface LiveCareProfileProps {
   profile: CareProfile;
@@ -11,15 +12,15 @@ interface LiveCareProfileProps {
   mode: CareMode;
 }
 
-const profileRows: { key: keyof CareProfile; label: string }[] = [
-  { key: "name", label: "Name" },
-  { key: "age", label: "Age" },
-  { key: "living", label: "Living situation" },
-  { key: "mobility", label: "Mobility" },
-  { key: "conditions", label: "Conditions" },
-  { key: "caregiver", label: "Caregiver" },
-  { key: "financialTier", label: "Financial tier" },
-  { key: "recentEvent", label: "Recent event" },
+const profileRows: { key: keyof CareProfile; labelKey: string }[] = [
+  { key: "name", labelKey: "chat.fieldName" },
+  { key: "age", labelKey: "chat.fieldAge" },
+  { key: "living", labelKey: "chat.fieldLiving" },
+  { key: "mobility", labelKey: "chat.fieldMobility" },
+  { key: "conditions", labelKey: "chat.fieldConditions" },
+  { key: "caregiver", labelKey: "chat.fieldCaregiver" },
+  { key: "financialTier", labelKey: "chat.fieldFinancialTier" },
+  { key: "recentEvent", labelKey: "chat.fieldRecentEvent" },
 ];
 
 function fieldValue(profile: CareProfile, key: keyof CareProfile): string {
@@ -31,22 +32,22 @@ function fieldValue(profile: CareProfile, key: keyof CareProfile): string {
 
 // In self mode the senior is the account holder, so the family member named in
 // the "caregiver" field is being kept informed, not operating on their behalf.
-function fieldLabel(key: keyof CareProfile, baseLabel: string, mode: CareMode): string {
-  if (key === "caregiver" && mode === "self") return "Notified family";
-  return baseLabel;
-}
-
 function FieldList({ profile, profileMeta, mode }: LiveCareProfileProps) {
+  const { t } = useLanguage();
+  // In self mode the senior is the account holder, so the family member named
+  // in "caregiver" is being kept informed, not operating on their behalf.
+  const labelFor = (key: keyof CareProfile, labelKey: string) =>
+    key === "caregiver" && mode === "self" ? t("chat.fieldNotifiedFamily") : t(labelKey);
   return (
     <div className="flex flex-col gap-3">
-      {profileRows.map(({ key, label }) => {
+      {profileRows.map(({ key, labelKey }) => {
         const value = fieldValue(profile, key);
         if (!value) return null;
         const meta = profileMeta[key];
         return (
           <ProfileFieldCard
             key={key}
-            label={fieldLabel(key, label, mode)}
+            label={labelFor(key, labelKey)}
             value={value}
             source={meta?.source ?? "chat"}
             justUpdated={meta?.justUpdated}
@@ -59,6 +60,7 @@ function FieldList({ profile, profileMeta, mode }: LiveCareProfileProps) {
 }
 
 export default function LiveCareProfile({ profile, profileMeta, mode }: LiveCareProfileProps) {
+  const { t: t2 } = useLanguage();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const filledCount = profileRows.filter(({ key }) => fieldValue(profile, key) !== "").length;
@@ -69,9 +71,9 @@ export default function LiveCareProfile({ profile, profileMeta, mode }: LiveCare
       {/* Desktop / tablet: profile docks as the right column. */}
       <div className="hidden h-full flex-col overflow-hidden md:flex">
         <div className="px-1 pb-4">
-          <h2 className="font-serif text-lg font-semibold text-ink">Living Care Profile</h2>
+          <h2 className="font-serif text-lg font-semibold text-ink">{t2("chat.profileTitle")}</h2>
           <p className="mt-0.5 text-sm text-ink-soft">
-            Assembling as you talk · {filledCount} of {total} fields
+            {t2("chat.profileAssembling")} · {filledCount}/{total} {t2("chat.fields")}
           </p>
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-2">
@@ -96,7 +98,7 @@ export default function LiveCareProfile({ profile, profileMeta, mode }: LiveCare
             <span className="flex flex-col items-start">
               <span className="mx-auto -mt-1 mb-1.5 h-1 w-9 rounded-full bg-hairline-warm" aria-hidden="true" />
               <span className="font-serif text-base font-semibold text-ink">
-                Living Care Profile · {filledCount}/{total}
+                {t2("chat.profileTitle")} · {filledCount}/{total}
               </span>
             </span>
             <ChevronUp

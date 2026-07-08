@@ -11,6 +11,7 @@ import TalkToHuman from "@/components/ui/TalkToHuman";
 import FlowStepper from "@/components/ui/FlowStepper";
 import { useChatState } from "@/hooks/useChatState";
 import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const planButtonFill: Record<"self" | "caregiver", string> = {
   self: "bg-self",
@@ -23,6 +24,7 @@ function ChatPageInner() {
   const router = useRouter();
 
   const guide = useAudioGuideCtx();
+  const { t } = useLanguage();
 
   const {
     messages,
@@ -74,7 +76,7 @@ function ChatPageInner() {
             href="/pathway"
             className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 ${planButtonFill[mode]}`}
           >
-            View care plan
+            {t("chat.viewCarePlan")}
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
@@ -91,6 +93,7 @@ function ChatPageInner() {
             inputValue={inputValue}
             onInputChange={setInputValue}
             onSend={() => sendMessage(inputValue)}
+            onQuickReply={(text) => sendMessage(text)}
           />
         </div>
         <div className="min-w-0 md:flex-1 md:overflow-hidden md:p-5">

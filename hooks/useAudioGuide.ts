@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { currentLang, SPEECH_LOCALE } from "@/lib/i18n";
 
 type GuideStatus = "off" | "idle" | "speaking" | "listening" | "paused";
 export type MicError = "denied" | "unsupported" | null;
@@ -98,7 +99,9 @@ export function useAudioGuide() {
         const res = await fetch("http://localhost:8000/voice/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event, context, mode }),
+          // language: the script is written (and spoken) in the user's chosen
+          // language; ElevenLabs multilingual handles zh/ms audio.
+          body: JSON.stringify({ event, context, mode, language: currentLang() }),
           signal: abortController.signal,
         });
 
@@ -195,7 +198,7 @@ export function useAudioGuide() {
       }
 
       const recognition = new SpeechRecognition();
-      recognition.lang = "en-SG";
+      recognition.lang = SPEECH_LOCALE[currentLang()];
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 

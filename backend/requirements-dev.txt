@@ -1,0 +1,5 @@
+# Test/CI-only dependencies. Runtime deps stay in requirements.txt so the
+# Docker image doesn't ship test tooling.
+-r requirements.txt
+pytest
+httpx  # required by fastapi.testclient.TestClient

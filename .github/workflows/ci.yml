@@ -1,0 +1,111 @@
+# CareKaki CI — runs on every push and pull request.
+#
+# Three independent jobs (fail one ≠ hide the others):
+#   frontend — ESLint, TypeScript typecheck, production Next.js build
+#   backend  — pytest suite (208 tests, fully offline: no API keys needed)
+#   docker   — builds both images and boots the full compose stack until
+#              healthchecks pass, i.e. exactly what the demo runs on
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# Superseded pushes to the same branch cancel the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Same-repo PRs already run via the push event; only run pull_request jobs
+# for forks so branches with open PRs aren't tested twice.
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  frontend:
+    name: Frontend (lint · typecheck · build)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20 to match Dockerfile.web (node:20-alpine).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend (pytest)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python 3.11 to match backend/Dockerfile (python:3.11-slim).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # No API keys on purpose: the suite must stay runnable offline
+      # (main.py builds the OpenAI client lazily when no key is set).
+      - name: Run tests
+        run: python -m pytest tests -v --tb=short
+
+  docker:
+    name: Docker (compose build + health)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: docker compose build
+
+      # --wait blocks until the healthchecks in docker-compose.yml pass
+      # (backend :8000 and web :3000), and fails if any container dies.
+      - name: Boot stack and wait for healthchecks
+        run: docker compose up --wait --wait-timeout 180
+
+      - name: Smoke-check endpoints
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/ > /dev/null
+          curl --fail --silent --show-error http://localhost:3000/ > /dev/null
+
+      - name: Dump container logs
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

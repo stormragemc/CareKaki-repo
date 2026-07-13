@@ -72,6 +72,68 @@
   --color-guardian-border: #BFD8C6; --color-guardian-border-dark: #4A6B52;
   --color-singpass: #F4453C;
 
+  /* ── AiMao — the panda companion design system ─────────────────────────────
+     "AiMao is the face. CareKaki is the intelligence underneath."
+     Warm, senior-friendly companion palette drawn from the physical robot concept. */
+  --color-aimao-cream: #FBF6EC;       /* warm canvas behind the companion */
+  --color-aimao-cream-deep: #F3EADA;  /* card wells on the warm surface */
+  --color-aimao-body: #FCFAF5;        /* panda body / face fill (near-white) */
+  --color-aimao-charcoal: #2B2A28;    /* panda ears, patches, limbs (near-black) */
+  --color-aimao-charcoal-soft: #45423E;
+  --color-aimao-ink: #33302B;         /* warm body text */
+  --color-aimao-ink-soft: #6E675D;
+  --color-aimao-ink-faint: #A79E90;
+  --color-aimao-hairline: #E9DFCE;
+  --color-aimao-blush: #F2B8A8;       /* cheeks — warmth */
+  --color-aimao-teal: #0E6E78;        /* brand accent (primary action) */
+  --color-aimao-teal-soft: #DDEFF0;
+  --color-aimao-teal-ink: #0A545C;
+  --color-aimao-blue: #1E3A5F;        /* deep, trustworthy (Care Plan) */
+  --color-aimao-green: #2E7D58;       /* healthy / done */
+  --color-aimao-green-soft: #E4F1EA;
+  /* drawer accents from the AiMao hardware (used as calm category tints) */
+  --color-aimao-orange: #E08A3C;      --color-aimao-orange-soft: #FBECD9;
+  --color-aimao-yellow: #E6B93F;      --color-aimao-yellow-soft: #FBF2D6;
+  --color-aimao-sky: #4C86B8;         --color-aimao-sky-soft: #E3EEF6;
+  --color-aimao-moss: #6E9A56;        --color-aimao-moss-soft: #E8F0DF;
+
+  /* AiMao motion → animate-aimao-* utilities. Gentle by design (elderly comfort). */
+  --animate-aimao-float: aimaoFloat 4.2s ease-in-out infinite;
+  --animate-aimao-blink: aimaoBlink 5.2s ease-in-out infinite;
+  --animate-aimao-blink-quick: aimaoBlink 3.4s ease-in-out infinite;
+  --animate-aimao-bounce: aimaoBounce 1.4s ease-in-out infinite;
+  --animate-aimao-listen: aimaoListen 1.9s ease-in-out infinite;
+  --animate-aimao-speak: aimaoSpeak 0.42s ease-in-out infinite;
+  --animate-aimao-sway: aimaoSway 5s ease-in-out infinite;
+
+  @keyframes aimaoFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+  }
+  /* Eyelids scale from open (0) to shut (1) briefly, then back. */
+  @keyframes aimaoBlink {
+    0%, 92%, 100% { transform: scaleY(0); }
+    95%, 97%      { transform: scaleY(1); }
+  }
+  @keyframes aimaoBounce {
+    0%, 100% { transform: translateY(0); }
+    30%      { transform: translateY(-10px); }
+    55%      { transform: translateY(0); }
+    70%      { transform: translateY(-4px); }
+  }
+  @keyframes aimaoListen {
+    0%, 100% { opacity: 0.15; transform: scale(0.9); }
+    50%      { opacity: 0.5;  transform: scale(1.12); }
+  }
+  @keyframes aimaoSpeak {
+    0%, 100% { transform: scaleY(0.55); }
+    50%      { transform: scaleY(1); }
+  }
+  @keyframes aimaoSway {
+    0%, 100% { transform: rotate(-2.5deg); }
+    50%      { transform: rotate(2.5deg); }
+  }
+
   /* fonts — Direction A */
   --font-serif: var(--font-newsreader), Georgia, serif;
   --font-sans: var(--font-plex-sans), system-ui, sans-serif;
@@ -146,4 +208,17 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* ── Print — the Care Plan / Care Brief become clean A4 documents ─────────────
+   Anything chrome-like (nav, floating companion, action bars) carries `no-print`
+   and is removed; the paper stretches edge-to-edge with sensible page breaks. */
+.no-print { }
+@media print {
+  .no-print { display: none !important; }
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #ffffff !important; }
+  .print-doc { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
+  /* Keep activity blocks, chart cards and sections whole across pages. */
+  .break-inside-avoid { break-inside: avoid; }
 }

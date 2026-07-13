@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { apiUrl } from "@/lib/api";
 
 type GuideStatus = "off" | "idle" | "speaking" | "listening" | "paused";
 export type MicError = "denied" | "unsupported" | null;
@@ -95,7 +96,7 @@ export function useAudioGuide() {
       speakLockRef.current = true;
 
       try {
-        const res = await fetch("http://localhost:8000/voice/speak", {
+        const res = await fetch(apiUrl("/voice/speak"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ event, context, mode }),

@@ -13,15 +13,22 @@ import {
   History,
   ClipboardList,
   RefreshCw,
+  Printer,
+  Copy,
+  Share2,
+  MessageCircle,
 } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import AudioGuideButton from "@/components/ui/AudioGuideButton";
 import FlowStepper from "@/components/ui/FlowStepper";
+import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
+import AskAiMao from "@/components/aimao/AskAiMao";
 import { loadDemoUser, loadCareProfile, deriveMode } from "@/lib/session";
 import { getPhase, getLastPhaseRecord, advancePhase, type PhaseRecord } from "@/lib/care-cycle";
 import { useVoiceEvent } from "@/hooks/useVoiceEvent";
 import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
+import { apiUrl } from "@/lib/api";
 import type { CareMode, CareProfile } from "@/lib/types";
 
 interface LiveBrief {
@@ -42,6 +49,7 @@ export default function HandoverPage() {
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState(1);
   const [lastPhase, setLastPhase] = useState<PhaseRecord | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const guide = useAudioGuideCtx();
 
@@ -72,7 +80,7 @@ export default function HandoverPage() {
       ? `${name}, ${age}. ${profile.recentEvent || "Care plan assembled"}. ${profile.living || ""} ${profile.conditions || ""}`.trim()
       : "A care plan has been assembled and is ready for a coordinator.";
 
-    fetch("http://localhost:8000/care-brief/generate", {
+    fetch(apiUrl("/care-brief/generate"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -129,9 +137,38 @@ export default function HandoverPage() {
 
   const eyebrow = mode === "self" ? "text-self-ink" : "text-caregiver-ink";
 
+  const briefToText = (b: LiveBrief) =>
+    `Care Brief — ${b.senior_name}${b.age ? `, ${b.age}` : ""}\n\n` +
+    `Situation:\n${b.situation}\n\n` +
+    `Done:\n${b.actions_taken.map((a) => `• ${a}`).join("\n")}\n\n` +
+    `Next steps:\n${b.next_steps.map((s) => `• ${s}`).join("\n")}\n\n` +
+    `Guardian-checked · PDPA scrubbed · no medical advice given.`;
+
+  const copyBrief = async () => {
+    try {
+      await navigator.clipboard.writeText(briefToText(brief));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  };
+
+  const shareBrief = async () => {
+    const text = briefToText(brief);
+    const nav = navigator as Navigator & {
+      share?: (d: { title: string; text: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ title: "Care Brief", text });
+      } catch {}
+    } else {
+      copyBrief();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-cream-deep flex flex-col motion-safe:animate-ck-fade-in">
-      <header className="px-6 py-4 flex items-center justify-between">
+      <header className="no-print px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Logo size={28} />
           <span className="font-serif font-semibold text-ink text-lg tracking-tight">CareKaki</span>
@@ -152,23 +189,40 @@ export default function HandoverPage() {
         </div>
       </header>
 
-      <FlowStepper />
+      <div className="no-print"><FlowStepper /></div>
+
+      {/* Action bar — share this handover, or return to conversation */}
+      <div className="no-print mx-auto flex w-full max-w-4xl flex-wrap items-center justify-end gap-2 px-4 pt-4 sm:px-6">
+        <BriefAction onClick={copyBrief} icon={<Copy size={16} />} label={copied ? "Copied ✓" : "Copy"} />
+        <BriefAction onClick={shareBrief} icon={<Share2 size={16} />} label="Share" />
+        <BriefAction onClick={() => window.print()} icon={<Printer size={16} />} label="Print" />
+        <Link
+          href="/chat"
+          className="inline-flex items-center gap-2 rounded-full bg-caregiver px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-caregiver-ink"
+        >
+          <MessageCircle size={16} aria-hidden="true" />
+          Review with AiMao
+        </Link>
+      </div>
 
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 pb-12 pt-6">
         {/* Care Brief document */}
-        <article className="bg-surface rounded-[14px] shadow-[0_14px_40px_rgba(30,42,51,0.10)] overflow-hidden">
+        <article className="print-doc bg-surface rounded-[14px] shadow-[0_14px_40px_rgba(30,42,51,0.10)] overflow-hidden">
           {/* Letterhead */}
           <div className="flex flex-wrap items-end justify-between gap-3 px-7 sm:px-10 pt-9 pb-5 border-b-2 border-ink">
-            <div className="flex flex-col gap-1">
-              <span className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${eyebrow}`}>
-                Care Brief · CareKaki
-                <span className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted">
-                  Phase {phase}
+            <div className="flex items-center gap-4">
+              <AiMaoCharacter expression="idle" size={60} className="shrink-0" />
+              <div className="flex flex-col gap-1">
+                <span className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] ${eyebrow}`}>
+                  Care Brief · CareKaki
+                  <span className="rounded-full bg-cream-deep px-2 py-0.5 text-ink-muted">
+                    Phase {phase}
+                  </span>
                 </span>
-              </span>
-              <h1 className="font-serif font-semibold text-3xl text-ink leading-tight">
-                {brief.senior_name}{brief.age ? `, ${brief.age}` : ""}
-              </h1>
+                <h1 className="font-serif font-semibold text-3xl text-ink leading-tight">
+                  {brief.senior_name}{brief.age ? `, ${brief.age}` : ""}
+                </h1>
+              </div>
             </div>
             <div className="text-right text-sm text-ink-soft leading-snug">
               <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">Prepared for</p>
@@ -300,7 +354,7 @@ export default function HandoverPage() {
         </article>
 
         {/* Continue the care cycle */}
-        <div className="mt-6 flex flex-col gap-4 rounded-[14px] border border-caregiver-border bg-caregiver-soft p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="no-print mt-6 flex flex-col gap-4 rounded-[14px] border border-caregiver-border bg-caregiver-soft p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-caregiver/15 text-caregiver">
               <RefreshCw size={20} aria-hidden="true" />
@@ -334,6 +388,32 @@ export default function HandoverPage() {
           </div>
         </div>
       </main>
+
+      <AskAiMao
+        variant="floating"
+        prompt="Has anything changed since this brief?"
+        context="Check whether anything has changed since the care brief"
+      />
     </div>
+  );
+}
+
+function BriefAction({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2 text-sm font-medium text-ink-body transition-colors hover:border-caregiver hover:text-caregiver"
+    >
+      <span aria-hidden="true">{icon}</span>
+      {label}
+    </button>
   );
 }

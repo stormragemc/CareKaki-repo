@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChatBubble, DraftNotice } from "./WorkspaceLog";
+import { apiUrl } from "@/lib/api";
 
 interface TelegramLogEntry {
   from: "bot" | "user";
@@ -35,7 +36,7 @@ export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) 
       } catch {}
 
       try {
-        await fetch("http://localhost:8000/carekaki/emergency-alert", {
+        await fetch(apiUrl("/carekaki/emergency-alert"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message }),
@@ -50,7 +51,7 @@ export default function TelegramFeed({ enabled = true }: { enabled?: boolean }) 
   useEffect(() => {
     if (!enabled) return; // held behind the approval gate
     const fetchLog = () => {
-      fetch("http://localhost:8000/telegram/log")
+      fetch(apiUrl("/telegram/log"))
         .then((res) => res.json())
         .then((data) => setLog(data.log ?? []))
         .catch(() => {});

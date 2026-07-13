@@ -9,6 +9,7 @@ import AudioGuideButton from "@/components/ui/AudioGuideButton";
 import GuardianBand from "@/components/ui/GuardianBand";
 import FlowStepper from "@/components/ui/FlowStepper";
 import AgentWorkspace, { resolveActivePanelIds } from "@/components/autopilot/AgentWorkspace";
+import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
 import { loadDemoUser, loadCareProfile } from "@/lib/session";
 import { useVoiceEvent } from "@/hooks/useVoiceEvent";
 import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
@@ -96,24 +97,24 @@ export default function AutopilotPage() {
       {/* Dark header — the deliberate "machine world" mood shift */}
       <header className="sticky top-0 z-50 bg-autopilot-bg/95 backdrop-blur-sm border-b border-autopilot-hairline">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <Logo size={28} theme="dark" />
+          <Link href="/home" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <AiMaoCharacter expression="thinking" size={40} />
             <span className="flex flex-col leading-tight">
               <span className="font-serif font-semibold text-autopilot-text text-lg tracking-tight">
-                Autopilot
+                AiMao&apos;s Mind
               </span>
               <span className="text-xs text-autopilot-muted">
-                {serviceCount} {serviceCount === 1 ? "service" : "services"} {approved ? "running" : "drafted"} for {name}
+                Expert view · {serviceCount} {serviceCount === 1 ? "process" : "processes"} {approved ? "running" : "drafted"} for {name}
               </span>
             </span>
           </Link>
 
           <div className="flex items-center gap-3">
             <Link
-              href="/pathway"
+              href="/home"
               className="text-sm text-autopilot-muted hover:text-autopilot-text transition-colors"
             >
-              ← Back to plan
+              ← Back to AiMao
             </Link>
             <AudioGuideButton theme="dark" />
             <TalkToHuman theme="dark" />
@@ -125,6 +126,7 @@ export default function AutopilotPage() {
 
       {/* Guardian wraps everything Autopilot runs, then the live workspace */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 overflow-hidden">
+        <ReasoningPipeline />
         <GuardianBand theme="dark" count={serviceCount} />
         <div className="flex-1 overflow-hidden">
           <AgentWorkspace approved={approved} onAllPanelsViewed={() => setCycleReady(true)} />
@@ -210,5 +212,42 @@ export default function AutopilotPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/**
+ * A plain-language trace of how AiMao turns a conversation into action. This is
+ * the "expert view" framing — the same services run underneath, shown as the
+ * reasoning steps a curious caregiver or a technical judge can inspect.
+ */
+function ReasoningPipeline() {
+  const steps = [
+    "Observation",
+    "Signal extraction",
+    "Profile update",
+    "Change detection",
+    "Guardian check",
+    "Care Brief",
+  ];
+  return (
+    <section className="rounded-2xl border border-autopilot-hairline bg-autopilot-card px-4 py-3">
+      <p className="mb-2 text-sm text-autopilot-muted">
+        How AiMao is thinking this through — the intelligence beneath the friendly face.
+      </p>
+      <ol className="flex items-center gap-1 overflow-x-auto pb-1">
+        {steps.map((s, i) => (
+          <li key={s} className="flex shrink-0 items-center gap-1">
+            <span className="rounded-full bg-autopilot-pill px-3 py-1.5 text-xs font-medium text-autopilot-text">
+              {s}
+            </span>
+            {i < steps.length - 1 && (
+              <span className="text-autopilot-muted" aria-hidden="true">
+                →
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

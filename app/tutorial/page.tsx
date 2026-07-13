@@ -63,7 +63,8 @@ function TutorialInner() {
     guide.speak("tutorial_overview", "", mode);
   };
 
-  const start = () => router.push(`/chat?mode=${mode}`);
+  // Land on the AiMao companion home — the calm hub the user returns to.
+  const start = () => router.push("/home");
 
   return (
     <div className="flex min-h-screen flex-col bg-cream">

@@ -59,7 +59,7 @@ export default function ChatPanel({
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted [animation-delay:150ms]" />
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted [animation-delay:300ms]" />
               </span>
-              CareKaki is updating the profile…
+              AiMao is thinking…
             </div>
           </div>
         )}

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { Message, CareProfile, ProfileMeta } from "@/lib/types";
+import { apiUrl } from "@/lib/api";
 
 const emptyProfile: CareProfile = {
   name: "",
@@ -117,7 +118,7 @@ export function useChatState() {
     const messagePayload = [...messages, userMsg];
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      const res = await fetch(apiUrl("/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: messagePayload }),

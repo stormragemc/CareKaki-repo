@@ -69,9 +69,20 @@ def log_iccp(from_: str, text: str, tone: str = "default", buttons: list[str] | 
 
 app = FastAPI()
 
+# CORS: allow local dev plus any deployed frontends listed in FRONTEND_ORIGINS
+# (comma-separated). Set FRONTEND_ORIGINS="*" to allow all (fine for a public demo
+# with no cookies/credentials).
+_origins_env = (os.getenv("FRONTEND_ORIGINS") or "").strip()
+if _origins_env == "*":
+    _allow_origins = ["*"]
+else:
+    _allow_origins = ["http://localhost:3000"] + [
+        o.strip() for o in _origins_env.split(",") if o.strip()
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

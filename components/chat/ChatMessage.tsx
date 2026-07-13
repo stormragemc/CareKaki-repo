@@ -1,4 +1,5 @@
 import type { CareMode, Message } from "@/lib/types";
+import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
 
 interface ChatMessageProps {
   message: Message;
@@ -14,15 +15,23 @@ const userFill: Record<CareMode, string> = {
 export default function ChatMessage({ message, mode }: ChatMessageProps) {
   const isAssistant = message.role === "assistant";
 
+  if (isAssistant) {
+    return (
+      <div className="flex items-end gap-2.5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-aimao-cream">
+          <AiMaoCharacter expression="idle" size={34} />
+        </span>
+        <div className="max-w-[80%] rounded-[6px_20px_20px_20px] border border-aimao-hairline bg-white px-4 py-3 text-lg leading-relaxed text-aimao-ink">
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={["flex", isAssistant ? "justify-start" : "justify-end"].join(" ")}>
+    <div className="flex justify-end">
       <div
-        className={[
-          "max-w-[80%] px-4 py-3 text-base leading-relaxed",
-          isAssistant
-            ? "rounded-[4px_18px_18px_18px] border border-hairline bg-surface text-ink-body"
-            : `rounded-[18px_4px_18px_18px] ${userFill[mode]} text-white`,
-        ].join(" ")}
+        className={`max-w-[80%] rounded-[20px_6px_20px_20px] px-4 py-3 text-lg leading-relaxed text-white ${userFill[mode]}`}
       >
         {message.content}
       </div>

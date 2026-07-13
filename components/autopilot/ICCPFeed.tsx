@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/api";
 
 interface ICCPLogEntry {
   from: "system" | "bot" | "user";
@@ -57,7 +58,7 @@ export default function ICCPFeed({ enabled = true }: { enabled?: boolean }) {
           }
         } catch {}
 
-        await fetch("http://localhost:8000/integrations/iccp/handover", {
+        await fetch(apiUrl("/integrations/iccp/handover"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -80,7 +81,7 @@ export default function ICCPFeed({ enabled = true }: { enabled?: boolean }) {
   useEffect(() => {
     if (!enabled) return;
     const fetchLog = () => {
-      fetch("http://localhost:8000/iccp/log")
+      fetch(apiUrl("/iccp/log"))
         .then((res) => res.json())
         .then((data) => setLog(data.log ?? []))
         .catch(() => {});

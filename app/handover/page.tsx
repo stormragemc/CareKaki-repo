@@ -24,6 +24,7 @@ import AiMaoCharacter from "@/components/aimao/AiMaoCharacter";
 import AiMaoLive from "@/components/aimao/AiMaoLive";
 import { briefTraceability } from "@/lib/demoCareData";
 import { getCareData } from "@/lib/careData";
+import { apiUrl } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import TalkToHuman from "@/components/ui/TalkToHuman";
 import AudioGuideButton from "@/components/ui/AudioGuideButton";
@@ -86,7 +87,7 @@ export default function HandoverPage() {
       ? `${name}, ${age}. ${profile.recentEvent || "Care plan assembled"}. ${profile.living || ""} ${profile.conditions || ""}`.trim()
       : "A care plan has been assembled and is ready for a coordinator.";
 
-    fetch("http://localhost:8000/care-brief/generate", {
+    fetch(apiUrl("/care-brief/generate"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { DraftNotice } from "./WorkspaceLog";
+import { apiUrl } from "@/lib/api";
 
 const MiniMap = dynamic(() => import("./MiniMap"), { ssr: false });
 
@@ -61,7 +62,7 @@ export default function AICFeed({ enabled = true }: { enabled?: boolean }) {
 
       setPhase({ step: "searching" });
       try {
-        const res = await fetch("http://localhost:8000/integrations/aic/recommend", {
+        const res = await fetch(apiUrl("/integrations/aic/recommend"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

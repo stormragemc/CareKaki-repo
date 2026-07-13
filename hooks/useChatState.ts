@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { currentLang, translate } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 import type { Message, CareProfile, ProfileMeta } from "@/lib/types";
 
 const emptyProfile: CareProfile = {
@@ -116,7 +117,7 @@ export function useChatState() {
     const messagePayload = [...messages, userMsg];
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      const res = await fetch(apiUrl("/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // language: the LLM replies in the user's chosen language (AiMao and

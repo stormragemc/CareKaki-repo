@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { DraftNotice } from "./WorkspaceLog";
+import { apiUrl } from "@/lib/api";
 
 const MiniMap = dynamic(() => import("./MiniMap"), { ssr: false });
 
@@ -67,7 +68,7 @@ export default function NursingFeed({ enabled = true }: { enabled?: boolean }) {
     const run = async () => {
       setPhase({ step: "searching" });
       try {
-        const res = await fetch("http://localhost:8000/integrations/nursing/recommend", {
+        const res = await fetch(apiUrl("/integrations/nursing/recommend"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

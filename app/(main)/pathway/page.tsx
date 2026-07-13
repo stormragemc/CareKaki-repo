@@ -13,6 +13,7 @@ import type { DemoUser } from "@/lib/demo-users";
 import { useVoiceEvent } from "@/hooks/useVoiceEvent";
 import { useAudioGuideCtx } from "@/contexts/AudioGuideContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiUrl } from "@/lib/api";
 
 // Session values are read-once and never mutate during a visit, so the
 // subscription is a no-op; useSyncExternalStore keeps the client read off the
@@ -135,7 +136,7 @@ export default function PathwayPage() {
     editFromVoiceRef.current = false;
     if (guide.enabled && !fromVoice) guide.speak("care_plan_edit_requested");
     try {
-      const res = await fetch("http://localhost:8000/pathway/edit-items", {
+      const res = await fetch(apiUrl("/pathway/edit-items"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items, mode, feedback, language: lang }),

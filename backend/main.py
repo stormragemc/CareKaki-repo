@@ -1,8 +1,8 @@
 import os
+import re
 import json
 import requests
 from datetime import datetime
-from openai import OpenAI
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,13 +11,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Construct the client lazily: the OpenAI v1 client raises if no key is present,
-# which would block the whole server from booting. Without a key the server still
-# runs — Guardian, health, and the keyword-based emergency/adapter logic all work
-# offline; only the LLM-backed replies degrade gracefully.
-_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-oai = OpenAI(api_key=_OPENAI_API_KEY) if _OPENAI_API_KEY else None
-CHAT_MODEL = "gpt-4.1-mini"
+# The LLM client, model, and language helpers live in the agent package so the
+# LangGraph nodes and this HTTP layer share one source of truth. `oai` is None when
+# no OPENAI_API_KEY is set — the server still boots and every deterministic path
+# (Guardian, emergency/adapter routing, the care graph's triage) runs offline.
+from agent.llm import oai, CHAT_MODEL, with_language
+from agent.triage import detect_emergency, plan_adapters
+from agent import run_care_turn
+
+# Persistence layer (Supabase / PostgreSQL). Active only when DATABASE_URL is set;
+# otherwise every call no-ops and the in-memory hackathon state below is used.
+from db import DB_ENABLED, init_db, repository
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -37,6 +41,7 @@ telegram_log: list[dict] = []
 coordinator_chat_id: int | None = None
 iccp_log: list[dict] = []
 iccp_cases: dict = {}
+last_case_ref: str | None = None  # most recent case, for persisting coordinator actions
 medication_log: list[dict] = []
 
 
@@ -92,38 +97,22 @@ def _register_webhook(api_base: str, token: str | None, path: str) -> None:
 
 
 @app.on_event("startup")
+def init_persistence() -> None:
+    """Create Supabase/Postgres tables if a DATABASE_URL is configured."""
+    if DB_ENABLED:
+        init_db()
+        print("[db] persistence enabled — tables ensured")
+    else:
+        print("[db] DATABASE_URL not set — using in-memory state")
+
+
+@app.on_event("startup")
 def register_telegram_webhooks() -> None:
     if not PUBLIC_BASE_URL or PUBLIC_BASE_URL in ("https://", "http://"):
         print("[webhook] PUBLIC_BASE_URL not set — skipping webhook registration")
         return
     _register_webhook(TELEGRAM_API, TELEGRAM_BOT_TOKEN, "/telegram/webhook")
     _register_webhook(ICCP_API, ICCP_BOT_TOKEN, "/iccp/webhook")
-
-SYSTEM_PROMPT = """You are CareKaki, a care navigator helping families in Singapore
-navigate community care services. You ask short, empathetic questions to understand
-the patient's situation — their living arrangements, mobility, conditions, caregiver
-situation, and financial tier. Keep responses concise and conversational."""
-
-# Reply-language instructions, keyed by the frontend's language code. Brand and
-# scheme names (AiMao, CareKaki, Guardian, CHAS, MediFund, SingPass, ICCP…)
-# always stay in English.
-LANGUAGE_INSTRUCTIONS = {
-    "zh": "\n\nReply entirely in Simplified Chinese (简体中文), in a warm everyday tone. "
-          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and Singapore scheme names "
-          "(CHAS, MediFund, SingPass, ICCP) in English.",
-    "ms": "\n\nReply entirely in Bahasa Melayu, in a warm everyday tone. "
-          "Keep the names 'AiMao', 'CareKaki', 'Guardian' and Singapore scheme names "
-          "(CHAS, MediFund, SingPass, ICCP) in English.",
-}
-
-
-def with_language(prompt: str, language: str) -> str:
-    return prompt + LANGUAGE_INSTRUCTIONS.get(language, "")
-
-EXTRACTION_PROMPT = """Extract any care profile fields you can confidently identify
-from this conversation. Return only a JSON object with these fields (omit fields you
-are not confident about):
-name, age, living, mobility, conditions, caregiver, financialTier, recentEvent"""
 
 PATHWAY_PROMPT = """Based on the care profile below, generate a personalised care
 pathway for a family in Singapore. Return only a JSON array of exactly 4 objects,
@@ -148,55 +137,6 @@ member. Classify their message and return only a JSON object with these fields:
 
 Caregiver message: """
 
-EMERGENCY_KEYWORDS = [
-    "fall", "fell", "collapsed", "collapse", "unconscious", "unresponsive",
-    "chest pain", "heart attack", "stroke", "seizure", "choking",
-    "bleeding", "can't breathe", "cannot breathe", "shortness of breath",
-    "emergency", "ambulance", "999", "995", "help now", "urgent",
-    "hit head", "head injury", "broken", "fracture",
-    "not moving", "not breathing", "fainted", "passed out",
-]
-
-
-def detect_emergency(text: str) -> bool:
-    lower = text.lower()
-    return any(kw in lower for kw in EMERGENCY_KEYWORDS)
-
-
-ADAPTER_RULES: list[tuple[list[str], list[str]]] = [
-    (["fall", "fell", "collapsed", "collapse", "fracture", "broken", "hit head", "head injury",
-      "not moving", "fainted", "passed out", "unconscious", "unresponsive"],
-     ["iccp", "aic", "telegram"]),
-    (["dizzy", "dizziness", "medication", "medicine", "drug", "pill", "tablet",
-      "side effect", "nausea", "vomit", "allergic", "reaction"],
-     ["medication", "telegram"]),
-    (["chest pain", "heart attack", "stroke", "seizure", "choking",
-      "bleeding", "can't breathe", "cannot breathe", "shortness of breath",
-      "not breathing", "ambulance", "999", "995"],
-     ["iccp", "telegram"]),
-    (["nursing", "home care", "wound", "dressing", "catheter", "injection",
-      "physiotherapy", "rehab", "discharge", "post-surgery"],
-     ["nursing", "iccp"]),
-    (["grant", "subsidy", "financial", "caregiver grant", "means test",
-      "assistance", "support scheme"],
-     ["aic"]),
-    (["lonely", "alone", "isolated", "social", "depressed", "activity centre",
-      "day care", "respite"],
-     ["aic", "nursing"]),
-]
-
-
-def plan_adapters(text: str) -> list[str]:
-    lower = text.lower()
-    active: list[str] = []
-    for triggers, adapters in ADAPTER_RULES:
-        if any(t in lower for t in triggers):
-            active.extend(adapters)
-    if not active:
-        active = ["iccp", "nursing", "aic", "telegram"]
-    return list(dict.fromkeys(active))
-
-
 class Message(BaseModel):
     role: str
     content: str
@@ -209,16 +149,6 @@ class ChatRequest(BaseModel):
 
 class PathwayRequest(BaseModel):
     profile: dict
-
-
-def to_openai_messages(messages: list[Message], system_prompt: str = ""):
-    msgs = []
-    if system_prompt:
-        msgs.append({"role": "system", "content": system_prompt})
-    for msg in messages:
-        role = "user" if msg.role == "user" else "assistant"
-        msgs.append({"role": role, "content": msg.content})
-    return msgs
 
 
 def send_telegram_message(chat_id: int, text: str, buttons: list[list[str]] | None = None):
@@ -257,59 +187,25 @@ def get_telegram_log():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    last_message = request.messages[-1].content
+    # One turn of the LangGraph care graph: intake → triage → respond → plan →
+    # guardian. Returns {content, profileUpdate, emergency, riskLevel, adapters,
+    # guardian}. The graph handles offline mode internally.
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    return run_care_turn(messages, request.language)
 
-    if oai is None:
-        # Offline mode (no OPENAI_API_KEY): no LLM reply or extraction, but the
-        # safety + emergency routing below are rule-based and still work.
-        reply = "CareKaki is running in offline mode — set OPENAI_API_KEY for live replies."
-        profile_update = {}
-    else:
-        # Main chat response
-        chat_messages = to_openai_messages(
-            request.messages, with_language(SYSTEM_PROMPT, request.language)
-        )
-        chat_resp = oai.chat.completions.create(
-            model=CHAT_MODEL,
-            messages=chat_messages,
-        )
-        reply = chat_resp.choices[0].message.content
 
-        # Profile extraction
-        role_label = {"user": "Patient", "assistant": "CareKaki"}
-        conversation_text = "\n".join(
-            f"{role_label.get(m.role, m.role)}: {m.content}" for m in request.messages
-        )
-        extraction_resp = oai.chat.completions.create(
-            model=CHAT_MODEL,
-            messages=[{"role": "user", "content": f"{EXTRACTION_PROMPT}\n\nConversation:\n{conversation_text}"}],
-            response_format={"type": "json_object"},
-        )
-
-        try:
-            profile_update = json.loads(extraction_resp.choices[0].message.content)
-        except Exception:
-            profile_update = {}
-
-    guardian = guardian_check(reply, adapter_name="chat", data_sources=["openai"])
-    safe_reply = guardian["safe_text"]
-    if guardian["medical_disclaimer"]:
-        safe_reply += f"\n\n{guardian['medical_disclaimer']}"
-
-    is_emergency = detect_emergency(last_message)
-    adapters = plan_adapters(last_message) if is_emergency else []
-
-    return {
-        "content": safe_reply,
-        "profileUpdate": profile_update,
-        "emergency": is_emergency,
-        "adapters": adapters,
-        "guardian": {"flags": guardian["flags"]},
-    }
+def _profile_external_id(profile: dict) -> str:
+    """Stable slug used as the persistent key for a senior's profile."""
+    name = str(profile.get("name") or "anon").strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", name).strip("-") or "anon"
+    return f"senior-{slug}"
 
 
 @app.post("/pathway")
 def pathway(request: PathwayRequest):
+    # Persist/merge the care profile so it accretes across sessions (no-op without a DB).
+    repository.upsert_profile(_profile_external_id(request.profile), request.profile)
+
     if oai is None:
         return {"columns": []}
 
@@ -481,6 +377,16 @@ def get_iccp_log():
     return {"log": iccp_log}
 
 
+@app.get("/cases")
+def get_cases():
+    """Persisted cases + timelines from Postgres. Falls back to in-memory state
+    (the hackathon dicts) when DATABASE_URL is unset."""
+    if DB_ENABLED:
+        return {"source": "postgres", "cases": repository.list_cases()}
+    cases = [{"case_ref": ref, **data} for ref, data in iccp_cases.items()]
+    return {"source": "memory", "cases": cases}
+
+
 @app.post("/integrations/iccp/handover")
 def iccp_handover(req: HandoverRequest):
     if not coordinator_chat_id:
@@ -498,6 +404,15 @@ def iccp_handover(req: HandoverRequest):
 
     log_iccp("system", f"Case packet assembled for {req.patient_name}", tone="success")
     log_iccp("system", f"Case {case_id} — Risk: {req.risk}", tone="success")
+
+    # Persist the case + first timeline event (no-op when DATABASE_URL is unset).
+    global last_case_ref
+    last_case_ref = case_id
+    repository.create_case(
+        case_ref=case_id, patient_name=req.patient_name, age=req.age,
+        issue=req.issue, risk=req.risk,
+    )
+    repository.add_event(case_id, "system", f"Case packet assembled for {req.patient_name}", tone="success")
 
     message = (
         f"<b>New ICCP-style Handover</b>\n\n"
@@ -552,14 +467,22 @@ async def iccp_webhook(request: Request):
             reply = f"{user_name} accepted the case. Follow-up in progress."
             log_iccp("user", f"{user_name}: Accepted case", tone="success")
             log_iccp("system", "Case status → In Progress", tone="success")
+            if last_case_ref:
+                repository.set_case_status(last_case_ref, "in_progress")
+                repository.add_event(last_case_ref, "user", f"{user_name}: Accepted case", tone="success")
         elif choice == "Request More Info":
             reply = f"{user_name} requested more info. CareKaki will provide additional details."
             log_iccp("user", f"{user_name}: Requested more info", tone="default")
             log_iccp("system", "Gathering additional patient info…", tone="pending")
+            if last_case_ref:
+                repository.add_event(last_case_ref, "user", f"{user_name}: Requested more info", tone="default")
         elif choice == "Escalate":
             reply = f"{user_name} escalated the case. Alerting senior coordinator."
             log_iccp("user", f"{user_name}: Escalated", tone="default")
             log_iccp("system", "Case escalated to senior coordinator", tone="pending")
+            if last_case_ref:
+                repository.set_case_status(last_case_ref, "escalated")
+                repository.add_event(last_case_ref, "user", f"{user_name}: Escalated", tone="default")
         elif choice == "Accept Review":
             reply = f"{user_name} accepted the medication review. Please type your recommendation in this group."
             log_medication("user", f"{user_name}: Accepted review", tone="success")
@@ -647,6 +570,24 @@ def medication_review(req: MedicationReviewRequest):
         packet["telegram_sent"] = False
 
     return packet
+
+
+# ── Hybrid RAG evidence retrieval ────────────────────────────────────────────
+
+
+class RagSearchRequest(BaseModel):
+    query: str
+    k: int = 5
+    rerank: bool = True
+
+
+@app.post("/rag/search")
+def rag_search(req: RagSearchRequest):
+    """Retrieve grounding evidence (AIC eldercare / CHAS clinics / HSA register)
+    via the hybrid retriever. Serves BM25 results in the light environment and
+    upgrades to dense + cross-encoder rerank when sentence-transformers is present."""
+    from rag.service import search_evidence
+    return search_evidence(req.query, k=req.k, use_rerank=req.rerank)
 
 
 # ── Guardian demo endpoint ───────────────────────────────────────────────────

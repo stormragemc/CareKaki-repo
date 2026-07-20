@@ -1,0 +1,9 @@
+# Hybrid RAG dependencies (in addition to backend/requirements.txt).
+# BM25 + fusion + eval run with just rank-bm25 + numpy. Dense retrieval and the
+# cross-encoder reranker need sentence-transformers (pulls in torch) — install
+# these on the machine that will serve dense retrieval.
+
+rank-bm25
+numpy
+scikit-learn
+sentence-transformers>=3.0     # dense embeddings + CrossEncoder reranker

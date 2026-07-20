@@ -4,3 +4,7 @@ openai
 python-dotenv
 requests
 pandas
+langgraph
+langchain-core
+sqlalchemy
+psycopg[binary]

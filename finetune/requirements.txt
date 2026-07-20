@@ -1,0 +1,17 @@
+# CareKaki fine-tuning stack. Install in a SEPARATE environment from the backend.
+# IMPORTANT: bitsandbytes wheels lag new Python releases — use Python 3.10 or 3.11
+# for this env (the backend can stay on 3.13). Install a CUDA build of torch that
+# matches your driver first: https://pytorch.org/get-started/locally/
+#
+#   conda create -n carekaki-ft python=3.11 -y && conda activate carekaki-ft
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+
+transformers>=4.44
+peft>=0.12
+bitsandbytes>=0.43
+accelerate>=0.33
+datasets>=2.20
+trl>=0.9            # used by the KTO/GRPO scaffolds
+sentencepiece
+scikit-learn        # eval metrics (F1)

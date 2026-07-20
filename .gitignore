@@ -46,3 +46,8 @@ __pycache__/
 .venv/
 venv/
 node_modules.nosync/
+
+# fine-tuning: ignore heavy model outputs + eval artifacts, KEEP the dataset (evidence)
+/finetune/out/
+/finetune/eval_results.json
+*.db
